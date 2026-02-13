@@ -34,6 +34,7 @@ Execute bounded codebase scan:
 Apply these lenses during reasoning:
 - **First Principles**: "What axioms is this requirement assuming? What is the user's REAL goal?"
 - **Future Look-back**: "If traffic/scale 10x in 2 years, does this design still hold?"
+- **Inversion**: "What would make this project definitely FAIL? What single mistake would be fatal?"
 
 ### Execution
 
@@ -51,10 +52,14 @@ Apply these lenses during reasoning:
 ## Sub-step 3: CLARIFY (user interaction)
 
 1. Show user QUICK_SCAN one-screen summary: confirmed facts + risk signals + strictness recommendation.
-2. AskUserQuestion: 1 batch of 3-7 decision-style questions (A/B/C + consequences per option).
+2. **Recommendation Pause** (for each question with a recommended option):
+   - **Socratic**: "What specific project-context reason supports this recommendation?"
+   - **Steelman**: "What's the strongest argument for the option I'm NOT recommending?"
+   - Survive: concrete reason exists → keep "(推荐)". Weak reasoning → present neutrally.
+3. AskUserQuestion: 1 batch of 3-7 decision-style questions (A/B/C + consequences per option).
    - Each question: Evidence anchor + Why asking + Options + Which IDs affected
-3. Write answers to rfc.md as DEC/REQ/SCN/HR.
-4. Non-blocking unknowns → Soft-Unresolved with owner + follow-up action.
+4. Write answers to rfc.md as DEC/REQ/SCN/HR.
+5. Non-blocking unknowns → Soft-Unresolved with owner + follow-up action.
 
 **Progress report**: After CLARIFY, report to user: "Clarifications recorded — {N} DEC/REQ/SCN written, {M} Soft-Unresolved tracked."
 
@@ -66,6 +71,7 @@ Apply these lenses during reasoning:
    - Current-state facts constraining design
 2. For each hard assertion → Grep+Read to locate evidence:
    - Record EVD-### in evidence.json (per methodology.md §6 field requirements)
+   - **Anti-confirmation-bias**: Also search for evidence that CONTRADICTS the assertion. If contradicting evidence is found, surface it as a risk in rfc.md (Unresolved or DEC).
 3. Insufficient evidence → write Unresolved/DEC in rfc.md
 4. Truncation events → write `.debug/events.jsonl`
 5. Update state.json: `current_phase → "design"`

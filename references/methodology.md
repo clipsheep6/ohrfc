@@ -280,3 +280,5 @@ Before writing, consider:
 - Security bounds: trust boundary, authorization point, unauthorized attempt → reject without side effects → attributable?
 - Compatibility: what must not change, what will change, default value strategy, rollback?
 - Observability: how to prove "decision happened / state converged / unauthorized rejected"?
+
+**Socratic Pause**: In addition to this checklist, DESIGN and DISCOVER phases embed mandatory Socratic Pause questions at each section. See `references/phase_design.md` Step 1/2 and `references/phase_discover.md` Sub-step 2/3 for the full protocol.

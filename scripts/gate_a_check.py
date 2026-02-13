@@ -24,12 +24,17 @@ SOFT checks (WARNING only, do not block):
 17. Orphan SCN (SCN not referenced by any HR or must-pass set)
 
 Usage:
-    python3 gate_a_check.py <rfc.md> [--evidence <evidence.json>] [--template <template.md>]
+    python3 gate_a_check.py <rfc.md> [--evidence <evidence.json>] [--template <template.md>] [--dry-run]
 
 Exit codes:
     0 - PASS (all hard checks passed, no soft warnings)
     0 - WARN (all hard checks passed, soft warnings exist; printed in report)
     1 - FAIL (any hard check failed)
+
+Dry-run mode (--dry-run):
+    Runs all 17 checks in advisory mode. Output is prefixed with [DRY-RUN].
+    Final line shows DRY-RUN RESULT: WOULD_PASS or DRY-RUN RESULT: WOULD_FAIL (N HARD failures).
+    Exit code is always 0 (advisory, not blocking).
 """
 
 import sys
@@ -1141,6 +1146,8 @@ def main():
     parser.add_argument('--evidence', '-e', help='Path to evidence.json', default=None)
     parser.add_argument('--template', '-t', help='Path to template.md for structure comparison', default=None)
     parser.add_argument('--config', '-c', help='Path to gate_a_config.json', default=None)
+    parser.add_argument('--dry-run', action='store_true',
+                        help='Run all checks in advisory mode (exit code always 0)')
     args = parser.parse_args()
 
     if not Path(args.rfc_path).exists():
@@ -1193,16 +1200,32 @@ def main():
 
     report = run_gate_a(hard_results, soft_results)
 
+    # Dry-run prefix helper
+    dry_run = args.dry_run
+    prefix = "[DRY-RUN] " if dry_run else ""
+
     # Report
-    print("=" * 60)
-    print("GATE-A: Structural Validation Report")
-    print("=" * 60)
+    print(f"{prefix}{'=' * 60}")
+    print(f"{prefix}GATE-A: Structural Validation Report")
+    print(f"{prefix}{'=' * 60}")
 
     for r in hard_results + soft_results:
-        print(r)
+        for line in str(r).split('\n'):
+            print(f"{prefix}{line}")
 
-    print("=" * 60)
+    print(f"{prefix}{'=' * 60}")
     overall = report["overall"]
+
+    if dry_run:
+        # Dry-run: advisory output, always exit 0
+        failed_count = len(report["hard_fail"])
+        if overall == "FAIL":
+            print(f"{prefix}DRY-RUN RESULT: WOULD_FAIL ({failed_count} HARD failures)")
+        else:
+            print(f"{prefix}DRY-RUN RESULT: WOULD_PASS")
+        sys.exit(0)
+
+    # Normal mode
     if overall == "PASS":
         print(f"RESULT: PASS (all {len(hard_results)} hard checks passed)")
         sys.exit(0)
