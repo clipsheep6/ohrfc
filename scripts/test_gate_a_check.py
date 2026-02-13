@@ -38,12 +38,12 @@ template_id: rfc_template_os_service
 template_version: 2026-01-01
 strictness: L2
 
-## 1. 背景
+## 1. 一页结论
+
+## 2. 背景
 现状描述。
 
-## 3. 目标与非目标
-
-## 4. 一页结论
+## 4. 目标与非目标
 
 ## 5. 方案概览
 
@@ -103,7 +103,7 @@ class TestCheck1Structure(unittest.TestCase):
         self.assertTrue(r.passed, f"Expected PASS but got: {r.issues}")
 
     def test_fail_missing_meta(self):
-        rfc = "# RFC\n## 1. 背景\n## 8. 安全模型\n## 11. 验收\n"
+        rfc = "# RFC\n## 2. 背景\n## 8. 安全模型\n## 11. 验收\n"
         r = check_1_structure(rfc, None)
         self.assertFalse(r.passed)
         self.assertTrue(any("template_id" in i for i in r.issues))
@@ -249,7 +249,7 @@ class TestCheck8Strictness(unittest.TestCase):
         self.assertTrue(r.passed)
 
     def test_fail_no_strictness(self):
-        rfc = "# RFC without strictness\n## 1. 背景\n"
+        rfc = "# RFC without strictness\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertFalse(r.passed)
 
@@ -280,7 +280,7 @@ class TestCheck9Triggers(unittest.TestCase):
         self.assertTrue(any("undefined" in i.lower() for i in r.issues))
 
     def test_fail_no_trigger_section(self):
-        rfc = "# RFC\n## 1. 背景\n内容\n"
+        rfc = "# RFC\n## 2. 背景\n内容\n"
         r = check_9_triggers(rfc)
         self.assertFalse(r.passed)
         self.assertTrue(any("No trigger" in i for i in r.issues))
@@ -316,12 +316,12 @@ template_id: rfc_template_os_service
 template_version: 2026-01-01
 strictness: L1
 
-## 1. 背景
+## 1. 一页结论
+
+## 2. 背景
 现状描述。
 
-## 3. 目标与非目标
-
-## 4. 一页结论
+## 4. 目标与非目标
 
 ## 5. 方案概览
 
@@ -382,13 +382,13 @@ template_id: rfc_template_os_service
 template_version: 2026-01-01
 strictness: L3
 
-## 1. 背景
+## 1. 一页结论
+
+## 2. 背景
 现状存在安全薄弱环节。
 
-## 3. 目标与非目标
+## 4. 目标与非目标
 REQ-001：加强信任边界控制
-
-## 4. 一页结论
 
 ## 5. 方案概览
 
@@ -463,7 +463,7 @@ class TestL1Scenarios(unittest.TestCase):
 
     def test_check_8_passes_with_l1(self):
         """check_8_strictness should PASS when strictness: L1 is declared."""
-        rfc = "# RFC\nstrictness: L1\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: L1\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Expected PASS for L1 but got: {r.issues}")
 
@@ -492,7 +492,7 @@ class TestL3Scenarios(unittest.TestCase):
 
     def test_check_8_passes_with_l3(self):
         """check_8_strictness should PASS when strictness: L3 is declared."""
-        rfc = "# RFC\nstrictness: L3\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: L3\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Expected PASS for L3 but got: {r.issues}")
 
@@ -517,7 +517,7 @@ class TestL3Scenarios(unittest.TestCase):
 
     def test_l3_strictness_field_case_insensitive(self):
         """Strictness field matching should be case-insensitive."""
-        rfc = "# RFC\nStrictness: l3\n## 1. 背景\n"
+        rfc = "# RFC\nStrictness: l3\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Case-insensitive L3 should pass: {r.issues}")
 
@@ -640,7 +640,7 @@ class TestBugRegressions(unittest.TestCase):
         """check_1 should FAIL when meta field appears only as substring in prose, not as field."""
         rfc = (
             "# RFC-20260101：Test\n"
-            "## 1. 背景\n"
+            "## 2. 背景\n"
             "We discuss template_id_generation in the next section.\n"
             "The template_version_history is long.\n"
             "Our strictness_level is not defined as a field.\n"
@@ -767,7 +767,7 @@ class TestCheck12MustPassValidity(unittest.TestCase):
 
     def test_pass_no_section_11(self):
         """No §11 section should skip check."""
-        rfc = "# RFC\n## 1. 背景\n内容\n"
+        rfc = "# RFC\n## 2. 背景\n内容\n"
         r = check_12_must_pass_validity(rfc)
         self.assertTrue(r.passed)
 
@@ -812,8 +812,8 @@ class TestCheck14SectionNonEmpty(unittest.TestCase):
         """Sections with ≥3 content lines should pass."""
         rfc = (
             "# RFC\ntemplate_id: x\ntemplate_version: x\nstrictness: L2\n"
-            "## 1. 背景\n现状描述\n问题分析\n影响范围\n"
-            "## 3. 目标\n目标1\n目标2\n目标3\n"
+            "## 2. 背景\n现状描述\n问题分析\n影响范围\n"
+            "## 4. 目标\n目标1\n目标2\n目标3\n"
             "## 5. 方案概览\n方案描述\n架构设计\n实施计划\n"
             "## 8. 安全模型\nSEC-HR-001：规则\n威胁模型\n安全措施\n"
             "## 9. 可靠性\n降级策略\n容错设计\n恢复机制\n"
@@ -827,8 +827,8 @@ class TestCheck14SectionNonEmpty(unittest.TestCase):
         """Section with <3 content lines should fail."""
         rfc = (
             "# RFC\nstrictness: L2\n"
-            "## 1. 背景\n一行内容\n"
-            "## 3. 目标\n目标1\n目标2\n目标3\n"
+            "## 2. 背景\n一行内容\n"
+            "## 4. 目标\n目标1\n目标2\n目标3\n"
             "## 5. 方案\n方案1\n方案2\n方案3\n"
             "## 8. 安全模型\n安全1\n安全2\n安全3\n"
             "## 9. 可靠性\n可靠1\n可靠2\n可靠3\n"
@@ -882,7 +882,7 @@ class TestCheck16UnresolvedFormat(unittest.TestCase):
 
     def test_pass_no_unresolved_section(self):
         """No unresolved section should produce no warnings."""
-        rfc = "# RFC\n## 1. 背景\n内容\n"
+        rfc = "# RFC\n## 2. 背景\n内容\n"
         r = check_16_unresolved_format(rfc)
         self.assertEqual(len(r.warnings), 0)
 
@@ -913,7 +913,7 @@ class TestCheck17OrphanSCN(unittest.TestCase):
 
     def test_pass_no_scns(self):
         """No SCN definitions should trivially pass."""
-        rfc = "# RFC\n## 1. 背景\n内容\n"
+        rfc = "# RFC\n## 2. 背景\n内容\n"
         r = check_17_orphan_scn(rfc)
         self.assertEqual(len(r.warnings), 0)
 
@@ -991,24 +991,24 @@ class TestNewStrictnessNaming(unittest.TestCase):
     """Tests for light/standard/full strictness naming (v2.0.0)."""
 
     def test_check_8_passes_with_standard(self):
-        rfc = "# RFC\nstrictness: standard\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: standard\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Expected PASS for 'standard' but got: {r.issues}")
 
     def test_check_8_passes_with_light(self):
-        rfc = "# RFC\nstrictness: light\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: light\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Expected PASS for 'light' but got: {r.issues}")
 
     def test_check_8_passes_with_full(self):
-        rfc = "# RFC\nstrictness: full\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: full\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Expected PASS for 'full' but got: {r.issues}")
 
     def test_check_8_case_insensitive(self):
         """Strictness naming should be case-insensitive."""
         for name in ['Standard', 'STANDARD', 'Full', 'FULL', 'Light', 'LIGHT']:
-            rfc = f"# RFC\nstrictness: {name}\n## 1. 背景\n"
+            rfc = f"# RFC\nstrictness: {name}\n## 2. 背景\n"
             r = check_8_strictness(rfc)
             self.assertTrue(r.passed, f"Expected PASS for '{name}' but got: {r.issues}")
 
@@ -1026,13 +1026,13 @@ class TestNewStrictnessNaming(unittest.TestCase):
 
     def test_check_8_full_no_upgrade_check(self):
         """Full with 5 roles should NOT trigger upgrade DEC check."""
-        rfc = "# RFC\nstrictness: full\n## 1. 背景\n使用 5 个角色进行审查\n"
+        rfc = "# RFC\nstrictness: full\n## 2. 背景\n使用 5 个角色进行审查\n"
         r = check_8_strictness(rfc)
         self.assertTrue(r.passed, f"Full with 5 roles should not need upgrade DEC: {r.issues}")
 
     def test_check_8_rejects_invalid_value(self):
         """Invalid strictness value should FAIL."""
-        rfc = "# RFC\nstrictness: medium\n## 1. 背景\n"
+        rfc = "# RFC\nstrictness: medium\n## 2. 背景\n"
         r = check_8_strictness(rfc)
         self.assertFalse(r.passed, "Invalid strictness value 'medium' should fail")
 

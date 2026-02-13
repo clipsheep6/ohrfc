@@ -32,14 +32,29 @@ No additional references required.
 
 When task export is requested or configured:
 
-1. **Extract task list**: Parse rfc.md §11 acceptance chapter → extract each SCN-### as a test task
-   - Format: `- [ ] SCN-### : {summary}` (one line per scenario)
-   - Write to `.ohrfc/<rfc_id>/tasks.md`
+**Reference**: Read `references/task_format.md` for the 6-field task specification (scope, depends, acceptance, invariants, context, on-ambiguity).
 
-2. **Extract must-pass set**: Filter SCN list for must-pass items → write to `.ohrfc/<rfc_id>/verification_checklist.md`
+### Generation Process
+
+1. **Parse & group**: Parse rfc.md §11 acceptance chapter → group SCN-### by module/component affinity
+2. **Create tasks**: For each group, create a TASK-### with:
+
+| rfc.md Section | Task Field | What to Extract |
+|----------------|------------|-----------------|
+| §6 (Impact/Scope) | `scope.modify` | Affected files/modules mapped to grouped SCNs |
+| §4.2 (Non-goals) + adjacent | `scope.boundary` | Out-of-scope modules and boundaries |
+| Inter-task analysis | `depends` | Data/control flow dependencies between tasks |
+| §11 (Acceptance) | `acceptance` | SCN-### in WHEN/THEN format, filtered by task scope |
+| §8.1 / §9.1 / §9.4 (Rules/Invariants) | `invariants` | SEC-HR / REL-HR / INV relevant to task scope |
+| §1 TL;DR + §7 (Decisions) | `context` | DEC-### excerpts + historical rationale |
+| §7.1 (Open Questions) | `on-ambiguity` | Hard/Soft unresolved items affecting task scope |
+
+3. **Extract must-pass set**: Filter SCN list for must-pass items → write to `.ohrfc/<rfc_id>/verification_checklist.md`
    - Format: markdown checklist with SCN-### ID, category, and one-line description
 
-3. **Output format**: Markdown by default. Future option: configurable export targets (Jira/Linear/GitHub Issues) via export adapter.
+4. **Write output**: `.ohrfc/<rfc_id>/tasks.md` — Markdown by default. Future option: configurable export targets (Jira/Linear/GitHub Issues) via export adapter.
+
+5. **Traceability**: Append `<!-- TRACE: §section → TASK-###.field -->` comments at end of tasks.md (see task_format.md §4).
 
 ## Hard Rule
 

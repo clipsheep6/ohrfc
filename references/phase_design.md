@@ -21,10 +21,10 @@ DESIGN execution uses a single sub-agent to write the complete rfc.md draft. The
 
 ## Step 1: Fill Review Layer (rfc.md §1-§6)
 
-- §1 背景: Current state + why now (facts, no code)
-- §2 用户痛点: User-perceivable problems only (no internal terms)
-- §3 目标与非目标: Verifiable goals (4 quality categories) + success criteria table + glossary
-- §4 一页结论: 3-6 decidable conclusions + impact table + must-pass SCN set + quality closure summary + reading guide
+- §1 一页结论: 3-6 decidable conclusions + reading guide + key index (pointers to §6/§11/§8/§9)
+- §2 背景: Current state + why now (facts, no code)
+- §3 用户痛点: User-perceivable problems only (no internal terms)
+- §4 目标与非目标: Verifiable goals (4 quality categories) + success criteria table + glossary
 - §5 方案概览: End-to-end main path + contracts + design diagrams (A: architecture/boundary, B: interaction sequence, C: failure/convergence) + Notes per diagram
 - §6 影响分析与兼容性: Unchanged/changed/default strategy + breaking changes + rollback + evidence spot-checks
 

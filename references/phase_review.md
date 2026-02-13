@@ -20,7 +20,7 @@ No additional references required. rfc.md is already in context from GATE phases
 
 1. **Present rfc.md** to user:
    - For short docs (< 200 lines): show full text
-   - For long docs: show key-section summary (§4 TL;DR + §11 must-pass + §14 triggers) with offer to show full text
+   - For long docs: show key-section summary (§1 TL;DR + §11 must-pass + §14 triggers) with offer to show full text
 
 2. **Collect decision** via AskUserQuestion:
    - Option A: Approve (accept as baseline)
@@ -47,8 +47,8 @@ The sub-agent performs each section analysis using only the provided artifacts, 
 
 **Review sequence** (7 items, each presented via AskUserQuestion):
 
-1. **§3-4 Constraints & Scope**
-   - AI analysis: boundary completeness, scope/non-goal coverage, constraint decidability
+1. **§1 & §4 TL;DR & Constraints**
+   - AI analysis: TL;DR conclusions consistency, boundary completeness, scope/non-goal coverage, constraint decidability
    - Thinking lens: First Principles — "What axioms are assumed? What if wrong?"
    - User: Confirm / Request changes
 

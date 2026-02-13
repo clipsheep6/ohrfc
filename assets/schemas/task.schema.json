@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ohrfc:task.schema.json",
+  "title": "OHRFC Task schema",
+  "description": "Validates task records exported from FINALIZE phase. Each task is an actionable implementation unit derived from rfc.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "title",
+    "scope",
+    "depends",
+    "acceptance",
+    "invariants"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^TASK-\\d{3}$",
+      "description": "Unique task identifier within the RFC workspace."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "description": "Short imperative description of the task."
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["modify"],
+      "properties": {
+        "modify": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "description": "Files, modules, or components to change."
+        },
+        "boundary": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "default": [],
+          "description": "What is explicitly out of scope (not to be changed)."
+        }
+      }
+    },
+    "depends": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^TASK-\\d{3}$"
+      },
+      "default": [],
+      "description": "Task IDs that must complete before this task can start."
+    },
+    "acceptance": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["scn_id", "scenario"],
+        "properties": {
+          "scn_id": {
+            "type": "string",
+            "pattern": "^SCN-\\d{3}$",
+            "description": "Reference to acceptance scenario in rfc.md §11."
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 10,
+            "description": "WHEN/THEN scenario summary."
+          }
+        }
+      },
+      "minItems": 1,
+      "description": "Acceptance scenarios from rfc.md §11 bound to this task."
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 5
+      },
+      "minItems": 1,
+      "description": "One-liner invariants from §8.1/§9.1/§9.4 that must hold."
+    },
+    "context": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Fade-out field. DEC/HR excerpts providing design rationale."
+    },
+    "on_ambiguity": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "Fade-out field. Protocol for handling cases not covered by the spec."
+    },
+    "trace": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^§"
+      },
+      "default": [],
+      "description": "Traceability references to rfc.md sections (e.g. '§11.3 → acceptance[SCN-003]')."
+    }
+  }
+}

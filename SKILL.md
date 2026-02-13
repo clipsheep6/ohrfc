@@ -16,7 +16,7 @@ description: >
 ---
 
 <!-- skill-meta
-version: 2.4.0
+version: 2.5.0
 date: 2026-02-12
 source_rev: git
 -->
@@ -154,7 +154,7 @@ python3 scripts/ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]
 **Execution**: Dispatch single `Task(general-purpose)` sub-agent to write complete rfc.md draft. Orchestrator receives draft, validates self-check, writes state transition.
 
 **Summary** (3 steps + optional parallel gap-filling):
-1. **Fill review layer** (§1-§6): background, pain points, goals, TL;DR, solution overview, impact/compatibility
+1. **Fill review layer** (§1-§6): TL;DR, background, pain points, goals, solution overview, impact/compatibility
 2. **Fill normative layer** (§7-§11): decisions, security model, reliability, observability, acceptance (5-category SCN)
 3. **Fill gates/appendix** (§12-§16): change log, trigger declarations, release meta, roles + self-check
 
@@ -265,7 +265,7 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 **Ref** (sub-agent): `references/phase_finalize.md`
 
 **Summary**:
-1. Export derivatives (tasks.md from SCN, acceptance checklist)
+1. Export derivatives (tasks.md from SCN, acceptance checklist). Task format follows `references/task_format.md` (6-field specification: scope, depends, acceptance, invariants, context, on-ambiguity)
 2. Archive process artifacts (events.jsonl, summary.json)
 3. Lock rfc.md normative content. State: phase=finalize.
 
@@ -327,6 +327,7 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 | `references/security_template.md` | STRIDE deep-dive template | DESIGN (high-risk) |
 | `references/reviewer_prompts/*.md` | Per-role review perspectives | GATE-B Map |
 | `references/checkpoint_protocol.md` | Checkpoint format, extraction prompts, bootstrap | DISCOVER exit, DESIGN exit, GATE-B FAIL |
+| `references/task_format.md` | Task format specification (6-field: scope, depends, acceptance, invariants, context, on-ambiguity) | FINALIZE |
 | `scripts/gate_a_check.py` | Automated 17-check Gate-A script (14 HARD + 3 SOFT) | GATE-A |
 | `scripts/ohrfc_init.py` | Automated INIT phase (workspace + skeleton + state) | INIT |
 | `assets/schemas/state.schema.json` | State tracking schema | INIT |
