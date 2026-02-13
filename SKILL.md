@@ -1,18 +1,11 @@
 ---
 name: ohrfc
 description: >
-  Use when creating design specs or RFCs from requirements, performing structured
-  requirements analysis with evidence, conducting system design reviews with quality
-  gates, needing boundary-first design with security/reliability/abuse coverage, or
-  validating technical documentation against mechanical and semantic quality criteria.
-  Industrial-grade workflow that converts requirements into testable design specs
-  (rfc.md) through evidence-based clarification, boundary-first design, and automated
-  quality gates (Gate-A mechanical + Gate-B semantic multi-role review). Outputs a
-  single normative rfc.md with evidence tracing, covering constraints, invariants,
-  trade-offs, and falsifiable acceptance scenarios.
-  Triggers on: "ohrfc", "/ohrfc", "create RFC", "design spec", "requirements analysis",
-  "system design review", "needs RFC", or when structured design documentation with
-  automated quality gates is needed.
+  Industrial-grade RFC workflow: requirements → testable rfc.md via evidence-based
+  clarification, boundary-first design, and dual quality gates (Gate-A mechanical +
+  Gate-B semantic multi-role review). Covers constraints, invariants, trade-offs,
+  and falsifiable acceptance criteria. Triggers: "ohrfc", "/ohrfc", "create RFC",
+  "design spec", "requirements analysis", "system design review".
 ---
 
 <!-- skill-meta
