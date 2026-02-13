@@ -1,0 +1,114 @@
+{
+  "min_scn_categories": [
+    "normal",
+    "reject_authn",
+    "reject_authz",
+    "limits_quota",
+    "dependency_down",
+    "abuse"
+  ],
+  "reject_categories": [
+    "reject_authn",
+    "reject_authz"
+  ],
+  "allowed_lang_tags": [
+    "",
+    "text",
+    "contract",
+    "json",
+    "mermaid",
+    "bash"
+  ],
+  "meta_fields": [
+    "template_id",
+    "template_version",
+    "strictness"
+  ],
+  "review_keywords": [
+    "背景",
+    "痛点",
+    "目标",
+    "结论",
+    "方案",
+    "影响"
+  ],
+  "normative_keywords": [
+    "安全",
+    "可靠",
+    "验收",
+    "决策",
+    "可观测"
+  ],
+  "heading_category_map": {
+    "normal": "normal",
+    "正常": "normal",
+    "authn": "reject_authn",
+    "authz": "reject_authz",
+    "权限": "reject_authz",
+    "越权": "reject_authz",
+    "reject": "reject_authz",
+    "limits": "limits_quota",
+    "quota": "limits_quota",
+    "非法值": "limits_quota",
+    "边界": "limits_quota",
+    "dependency": "dependency_down",
+    "依赖": "dependency_down",
+    "故障": "dependency_down",
+    "recovery": "dependency_down",
+    "abuse": "abuse",
+    "滥用": "abuse",
+    "鲁棒": "abuse"
+  },
+  "placeholder_patterns": [
+    "(?<![A-Za-z])TBD(?![A-Za-z])",
+    "(?<![A-Za-z])XXX(?![A-Za-z])",
+    "(?<![A-Za-z])TODO(?![A-Za-z])",
+    "(?<![A-Za-z])FIXME(?![A-Za-z])",
+    "<\\.\\.\\.>"
+  ],
+  "hard_checks": {
+    "check_10_hr_scn_binding": {
+      "enabled": true,
+      "description": "Every HR-### must be referenced by at least one SCN-### body"
+    },
+    "check_11_dec_alternatives": {
+      "enabled": true,
+      "description": "Every DEC-### must contain alternatives or single-path justification"
+    },
+    "check_12_must_pass_validity": {
+      "enabled": true,
+      "description": "All SCN IDs in must-pass set (§11) must exist as defined SCN-###"
+    },
+    "check_13_coverage_matrix": {
+      "enabled": true,
+      "description": "Standard/Full strictness requires risk→SCN mapping table in §11"
+    },
+    "check_14_section_non_empty": {
+      "enabled": true,
+      "description": "Required template sections must have ≥3 non-whitespace content lines"
+    }
+  },
+  "soft_checks": {
+    "check_15_diagram_text_pairing": {
+      "enabled": true,
+      "description": "Every mermaid block should have prose text within 10 lines"
+    },
+    "check_16_unresolved_format": {
+      "enabled": true,
+      "description": "Hard-Unresolved items should contain owner/action/convergence keywords"
+    },
+    "check_17_orphan_scn": {
+      "enabled": true,
+      "description": "SCN-### not referenced by any HR or must-pass set"
+    }
+  },
+  "required_sections": [
+    "背景",
+    "目标",
+    "方案",
+    "安全",
+    "可靠",
+    "验收",
+    "决策"
+  ]
+}

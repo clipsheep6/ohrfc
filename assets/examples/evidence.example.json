@@ -1,0 +1,38 @@
+{
+  "schema_version": "v1",
+  "items": [
+    {
+      "evd_id": "EVD-001",
+      "source_type": "code",
+      "locator": "path/to/file.ext:123",
+      "repo_rev": "git-sha-or-build-id",
+      "summary": "现状：对外入口与裁决点位置（用于支撑 HR/DEC 的硬断言）。",
+      "truncated": false,
+      "truncation_reason": "",
+      "confidence": "high",
+      "links_to": ["HR-001", "DEC-001", "SCN-010"]
+    },
+    {
+      "evd_id": "EVD-002",
+      "source_type": "external",
+      "locator": "doc=<spec-name>, version=<v>, date=YYYY-MM-DD, section=<...>",
+      "repo_rev": "n/a",
+      "summary": "外部规范：权限模型/错误口径/兼容性约束。",
+      "truncated": false,
+      "truncation_reason": "",
+      "confidence": "medium",
+      "links_to": ["SEC-HR-001", "SCN-010"]
+    },
+    {
+      "evd_id": "EVD-003",
+      "source_type": "user_input",
+      "locator": "chat_turn=<id>",
+      "repo_rev": "n/a",
+      "summary": "需求原文锚点：三类 usage 强度开关 + followSystemIntensity 参数能力边界。",
+      "truncated": false,
+      "truncation_reason": "",
+      "confidence": "medium",
+      "links_to": ["REQ-001", "DEC-002"]
+    }
+  ]
+}

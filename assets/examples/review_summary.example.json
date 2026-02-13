@@ -1,0 +1,39 @@
+{
+  "result": "FAIL",
+  "blocking_reasons": [
+    "Hard-Unresolved 未清零：Unresolved/Hard/UNR-002（影响恢复收敛验收）"
+  ],
+  "p0_issues": [],
+  "p1_issues": [
+    {
+      "location": "§9 可靠性与健壮性 / REL-HR-002",
+      "issue": "缺少"依赖重启后最终收敛"的可证伪 SCN 绑定",
+      "risk": "明年线上出现状态漂移争论且无法回归验证",
+      "action": "新增 SCN-031（dependency_down）并链接到 REL-HR-002，写清 WHEN/THEN 分行 + 禁止副作用",
+      "evidence": "EVD-001"
+    }
+  ],
+  "p2_issues": [
+    {
+      "location": "§7 关键决策与取舍 / DEC-004",
+      "issue": "DEC 文本偏长，建议压到 4–6 行并把细节下沉到 HR/SCN",
+      "risk": "降低人审信息密度",
+      "action": "替换 DEC-004 为短 DEC（结论/理由/验收绑定/可选后续）"
+    }
+  ],
+  "required_actions": [
+    {
+      "location": "§11 验收 / 依赖故障与恢复",
+      "edit": "Add SCN-031: dependency_down / 依赖重启后的收敛（WHEN/AND/THEN 分行，Links: REL-HR-002）"
+    },
+    {
+      "location": "§7 未决事项",
+      "edit": "Resolve UNR-002: 补证据或改写为 DEC 风险接受（含缓解/追踪），否则 Gate-B 不允许 PASS"
+    }
+  ],
+  "role_votes": {
+    "security": "pass",
+    "reliability": "fail",
+    "performance": "pass"
+  }
+}

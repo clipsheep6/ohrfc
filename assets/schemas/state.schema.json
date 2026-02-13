@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ohrfc:state.schema.json",
+  "title": "OHRFC state.json schema (v2)",
+  "description": "Tracks RFC lifecycle: current phase, gate rounds, strictness, and reviewer configuration. Updated by orchestrator at each phase transition.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "rfc_id",
+    "current_phase",
+    "strictness",
+    "template_id",
+    "template_version",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "const": "v2" },
+    "rfc_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Unique identifier for this RFC workspace (e.g. rfc-20260210-auth-model)."
+    },
+    "current_phase": {
+      "type": "string",
+      "enum": ["init", "discover", "design", "gate_a", "gate_b", "review", "finalize", "baseline_change"],
+      "description": "Current workflow phase. baseline_change is entered when modifying an accepted baseline."
+    },
+    "strictness": {
+      "type": "string",
+      "enum": ["light", "standard", "full"],
+      "default": "standard"
+    },
+    "template_id": { "type": "string", "minLength": 1 },
+    "template_version": { "type": "string", "minLength": 1 },
+    "template_ref": {
+      "type": "string",
+      "description": "Optional: git sha / tag / path for audit traceability."
+    },
+    "gate_a_result": {
+      "type": ["string", "null"],
+      "enum": ["pass", "fail", null],
+      "default": null
+    },
+    "gate_b_round": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Current Gate-B round (0 = not started)."
+    },
+    "gate_b_max_rounds": {
+      "type": "integer",
+      "enum": [0, 2, 3],
+      "description": "Derived from strictness: Light=0 (Gate-B skipped), Standard=2, Full=3."
+    },
+    "gate_b_result": {
+      "type": ["string", "null"],
+      "enum": ["pass", "fail", null],
+      "default": null
+    },
+    "reviewer_count": {
+      "type": "integer",
+      "enum": [0, 3, 4],
+      "default": 3,
+      "description": "Number of Gate-B reviewer roles. Light=0 (Gate-B skipped); Standard=3 (Architect+Security+QA); Full=4 (adds Meta-Reviewer)."
+    },
+    "upgrade_triggers": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": [],
+      "description": "List of Standard→Full upgrade trigger conditions that were hit."
+    },
+    "baseline_accepted": {
+      "type": "boolean",
+      "default": false,
+      "description": "True after REVIEW phase passes. Subsequent changes require baseline_change loop."
+    },
+    "checkpoint_version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Incremented each time checkpoint.md is written. 0 = no checkpoint yet."
+    },
+    "last_checkpoint_phase": {
+      "type": ["string", "null"],
+      "enum": ["discover", "design", "gate_b", "review", null],
+      "default": null,
+      "description": "Phase at which the last checkpoint was written. Used by bootstrap protocol."
+    },
+    "sub_step_progress": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "Current sub-step within phase (e.g., 'evidence_gathering_3_of_5')"
+    },
+    "detour_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of times execution detoured from main path"
+    },
+    "rejection_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "Number of Gate-B rejections (FAIL rounds)"
+    },
+    "gate_b_mode": {
+      "type": ["string", "null"],
+      "enum": ["self_review", "parallel_current", "parallel_multi_model", null],
+      "default": null,
+      "description": "Active Gate-B review mode"
+    },
+    "reviewer_dispatch": {
+      "type": "object",
+      "properties": {
+        "default": { "type": "string", "default": "task" },
+        "models": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "type": { "type": "string", "enum": ["task", "mcp"] },
+              "server": { "type": "string" },
+              "tool": { "type": "string" }
+            }
+          }
+        },
+        "role_assignment": {
+          "type": "object",
+          "properties": {
+            "architect": { "type": "string", "default": "current" },
+            "security": { "type": "string", "default": "current" },
+            "qa": { "type": "string", "default": "current" },
+            "meta": { "type": "string", "default": "current" }
+          }
+        },
+        "fallback_chain": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["current"]
+        }
+      },
+      "default": {}
+    },
+    "web_search_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable web search for external evidence during DISCOVER"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

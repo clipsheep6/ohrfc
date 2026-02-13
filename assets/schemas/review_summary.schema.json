@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ohrfc:review_summary.schema.json",
+  "title": "OHRFC Gate-B Reduce summary.json schema (v1 minimal)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "result",
+    "blocking_reasons",
+    "p0_issues",
+    "p1_issues",
+    "p2_issues",
+    "required_actions"
+  ],
+  "properties": {
+    "result": { "type": "string", "enum": ["PASS", "FAIL"] },
+    "blocking_reasons": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "p0_issues": { "$ref": "#/$defs/issues" },
+    "p1_issues": { "$ref": "#/$defs/issues" },
+    "p2_issues": { "$ref": "#/$defs/issues" },
+    "required_actions": { "$ref": "#/$defs/actions" },
+    "role_votes": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "enum": ["pass", "fail"] }
+    }
+  },
+  "$defs": {
+    "issues": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/issue" }
+    },
+    "actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/action" }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "issue", "risk", "action"],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "issue": { "type": "string", "minLength": 1 },
+        "risk": { "type": "string", "minLength": 1 },
+        "action": { "type": "string", "minLength": 1 },
+        "evidence": { "type": "string" }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["location", "edit"],
+      "properties": {
+        "location": { "type": "string", "minLength": 1 },
+        "edit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Minimal edit instruction, e.g. 'Add SCN-023 ...' or 'Replace HR-007 ...'."
+        }
+      }
+    }
+  }
+}
+

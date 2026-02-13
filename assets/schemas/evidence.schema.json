@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ohrfc:evidence.schema.json",
+  "title": "OHRFC evidence.json schema (v1 minimal)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "items"],
+  "properties": {
+    "schema_version": { "type": "string", "minLength": 1 },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/evidence_item" }
+    }
+  },
+  "$defs": {
+    "evidence_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evd_id", "source_type", "locator", "summary", "truncated", "confidence", "links_to"],
+      "properties": {
+        "evd_id": { "type": "string", "pattern": "^EVD-[0-9]{3,}$" },
+        "source_type": {
+          "type": "string",
+          "enum": ["code", "config", "doc", "external", "user_input"]
+        },
+        "locator": { "type": "string", "minLength": 1 },
+        "repo_rev": { "type": "string", "minLength": 1 },
+        "summary": { "type": "string", "minLength": 1 },
+        "truncated": { "type": "boolean" },
+        "truncation_reason": { "type": "string" },
+        "confidence": { "type": "string", "enum": ["low", "medium", "high"] },
+        "links_to": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source_type": { "const": "user_input" } } },
+          "then": {
+            "description": "user_input 来源允许缺少 repo_rev；若能提供（例如会议纪要版本/录音编号）也可填写。",
+            "required": []
+          },
+          "else": {
+            "description": "非 user_input 来源必须可复核：至少提供 repo_rev。",
+            "required": ["repo_rev"]
+          }
+        }
+      ]
+    }
+  }
+}
