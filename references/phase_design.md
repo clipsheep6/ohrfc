@@ -4,6 +4,8 @@
 
 ## Prerequisites (sub-agent context)
 
+**Sub-agent type**: `Task(Plan)` preferred (architectural reasoning optimized; has Read/Glob/Grep/Bash/MCP but no Write/Edit — orchestrator remains single-writer). Fallback: `Task(general-purpose)` if Plan unavailable.
+
 The DESIGN sub-agent must load:
 - `references/rfc_template.md` — section structure and fill-in skeleton
 - `references/design_assets.md` — SCN/DEC/Sources writing templates
@@ -19,9 +21,20 @@ Orchestrator executes Bootstrap Protocol from `references/checkpoint_protocol.md
 
 DESIGN execution uses a single sub-agent to write the complete rfc.md draft. The orchestrator dispatches with all context (requirements + evidence + constraints from DISCOVER), and the sub-agent returns the completed draft. The orchestrator then validates the draft against self-check criteria before proceeding.
 
+**Interrupt-resume for fork escalation**: When the sub-agent encounters an emergent fork (see Socratic Pause → Emergent Fork Escalation), execution is interrupted:
+1. Sub-agent returns partial draft + fork escalation signal (instead of complete draft)
+2. Orchestrator presents fork to user via AskUserQuestion
+3. Orchestrator dispatches new sub-agent with: partial draft + user's fork decision as additional constraint + original context
+4. New sub-agent completes the remaining sections, incorporating the fork resolution
+5. If a second fork occurs, the same interrupt-resume cycle applies (max 2 per DESIGN phase)
+
+**Relation to gap-filling**: Fork escalation happens *during* DESIGN (direction decisions). Gap-filling reviewers run *after* DESIGN (completeness/quality checks). The two mechanisms are complementary and do not conflict.
+
 ## Step 1: Fill Review Layer (rfc.md §1-§6)
 
 ### Socratic Pause Protocol
+
+Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) for each section's Socratic Pause — structured multi-step thinking helps surface non-obvious architectural trade-offs and cross-section dependencies.
 
 At each section, the sub-agent MUST pause and answer internally:
 1. **Core (always)**: C1 "Are we solving symptoms or the ROOT problem?" + C2 "Looking back one year, would this still be the best choice?"
@@ -37,7 +50,36 @@ At each section, the sub-agent MUST pause and answer internally:
 | Security / trust boundary change in DISCOVER | "Trust boundary change → do we need SEC-HR + reject/abuse SCN?" | Before writing §8, check DISCOVER findings |
 | Compatibility risk in DISCOVER | "Is the default value strategy explicit? Is old behavior explicitly preserved?" | Before writing §6, check DISCOVER findings |
 
-Only proceed to write after all Pause questions are answered satisfactorily.
+#### Emergent Fork Escalation
+
+When Socratic Pause reveals a fork (§5 or §7: "Why this over the 2nd best?" has no clear answer):
+
+**Confidence assessment**:
+- **High confidence (>80%)**: Select recommended approach. Record in DEC-### with alternatives + rationale.
+- **Low confidence (≤80%)**: Trigger escalation signal → return to orchestrator for user decision.
+
+**Escalation signal format** (returned to orchestrator):
+```text
+FORK_ESCALATION:
+  section: §5 / §7
+  description: <what the fork is about>
+  option_a: { summary, trade_offs, affected_ids[] }
+  option_b: { summary, trade_offs, affected_ids[] }
+  recommendation: A / B / none
+  confidence: 0-100
+```
+
+**Orchestrator handling**:
+1. Pause/restart DESIGN sub-agent
+2. Present fork to user via AskUserQuestion (options with trade-offs + recommendation if any)
+3. User's choice becomes a new constraint → sub-agent continues design with choice as input
+
+**Conservative trigger constraints** (prevent over-escalation):
+- Max 2 escalations per DESIGN phase
+- Only **architectural-level** forks qualify (affects ≥3 IDs OR spans ≥2 rfc.md sections)
+- Implementation-level choices (library selection within same architecture) → sub-agent decides autonomously via DEC-###
+
+Only proceed to write after all Pause questions are answered satisfactorily (including any fork escalation resolution).
 
 - §1 背景:
   - **Pause**: "What's the ONE fact that, if wrong, invalidates everything below?"

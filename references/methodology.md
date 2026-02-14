@@ -23,6 +23,25 @@
 
 Design = confirm constraint set → narrow solution space → clarify trade-offs → verifiable acceptance
 
+Fork Resolution Pipeline (DISCOVER → DESIGN):
+```
+Requirements + Code Scan
+    ↓
+DISCOVER CLARIFY: resolve known forks
+  → Tier 1 (constraint conflicts): reshape solution space
+  → Tier 2 (direction forks): select design direction
+  → Tier 3 (boundary clarification): refine constraints
+    ↓
+User answers → DEC/REQ/HR/SCN written to rfc.md
+    ↓
+DESIGN: build on resolved constraints
+  → Socratic Pause internal challenges
+  → Emergent fork (≤80% confidence) → escalation signal → user decision
+  → Final design → DEC-### records all trade-offs
+    ↓
+GATE-A/B: verify constraint completeness + trade-off soundness
+```
+
 Essence of `rfc.md`:
 - Constraint set: boundaries / prohibitions / limits (determine solution space)
 - Invariants: red lines (security, no side effects, auditable)
@@ -41,13 +60,29 @@ Essence of `rfc.md`:
 
 | Purpose | Preferred | Fallback |
 |---------|-----------|----------|
-| Find files/symbols | `Glob` / `mcp__serena__find_symbol` | `Grep` |
-| Search code/text | `Grep` / `mcp__code-index__search_code_advanced` | `mcp__serena__search_for_pattern` |
+| Find code symbols (functions/classes/interfaces) | `mcp__serena__find_symbol` / `mcp__serena__get_symbols_overview` | `Grep` |
+| Find files by pattern | `Glob` | `mcp__serena__find_file` |
+| Search text/config (keywords, error codes, config keys) | `Grep` | `mcp__serena__search_for_pattern` |
 | Read files | `Read` | `mcp__serena__find_symbol` (include_body) |
 | Create/write files | `Write` | `Edit` (for modifying existing files) |
 | Reasoning/planning | `mcp__sequential-thinking__sequentialthinking` | Internal reasoning |
 | User interaction | `AskUserQuestion` | — |
 | Parallel subtasks | `Task` (subagent_type per need) | — |
+
+**Search strategy by scenario**:
+- **Code symbol lookup** (function/class/interface definitions, method signatures): Use serena semantic tools (`find_symbol`, `get_symbols_overview`) for AST-level precision. Grep may false-match comments/strings.
+- **Text/config search** (keywords, error codes, config values, comments): Use Grep for fast regex matching. serena `search_for_pattern` as fallback for complex multi-line patterns.
+- **Mixed** (unknown whether target is symbol or text): Start with Grep; if results are noisy, refine with serena semantic search.
+
+**`sequential-thinking` applicable phases**:
+| Phase | Use Case |
+|-------|----------|
+| DISCOVER REASONING_PASS | Risk analysis, unknown identification, strictness recommendation |
+| DISCOVER CLARIFY | Recommendation Pause — challenge recommended options before presenting to user |
+| DESIGN Socratic Pause | Per-section architectural decision challenges (Core C1+C2 + section-fixed + context-dynamic) |
+| GATE-B Reduce | Multi-report conflict resolution, cross-role contradiction analysis |
+| REVIEW Mode C Step 1 | Multi-thinking-model pre-analysis, risk prioritization |
+| Checkpoint Bootstrap | Context reconstruction reasoning from checkpoint.md |
 
 ### 1.2 Per-Phase Tool Permissions
 
@@ -149,10 +184,10 @@ Full 7-phase path with maximum rigor.
 | ID | Purpose | Notes |
 |----|---------|-------|
 | HR-### | Hard rule / red line / limit | Must be decidable. Optional domain prefix: SEC-HR, REL-HR, API-HR |
-| DEC-### | Decision & trade-off | Includes risk acceptance & mitigation |
+| DEC-### | Decision & trade-off | Includes risk acceptance & mitigation. In post-baseline changes: documents WHY the change was made + alternatives considered. |
 | REQ-### | Requirement & constraint | Includes scope/non-goal |
 | SCN-### | Acceptance scenario (EARS) | Chinese + WHEN/AND/THEN, must declare category |
-| CHG-### | Post-baseline change | |
+| CHG-### | Post-baseline change record | Documents WHAT changed (affected sections, IDs, before/after delta). Paired with DEC-### for WHY. |
 | EVD-### | Evidence | Must exist in evidence.json |
 
 Rules: IDs globally unique; referenced IDs must exist (no dangling); deletion requires CHG/DEC; no TBD/XXX/TODO placeholders.
@@ -171,6 +206,22 @@ The most common confusion is not "nothing was written" but "the same term means 
 **Maintenance rules** (prevent drift):
 - To change "concept meaning / rule caliber," only modify the canonical source (SSOT); other documents reference, never redefine.
 - Before adding a new concept, check: can it fit an existing axis? If yes, extend that axis's single definition; only add a new axis if not.
+
+### 4.2 Question Priority Tiers
+
+Questions generated during DISCOVER CLARIFY are prioritized into tiers. Higher tiers are asked first; lower tiers are filtered or deferred.
+
+| Tier | Name | Criteria | Handling |
+|------|------|----------|----------|
+| **Tier 1** | Constraint Conflict | Code contradicts requirement / requirements internally contradict / security boundary implicitly crossed | **Must ask** — answer changes the entire solution space |
+| **Tier 2** | Direction Fork | ≥2 architectural approaches with distinct trade-offs; answer affects ≥3 downstream IDs | **Must ask** — answer determines design direction |
+| **Tier 3** | Boundary Clarification | Scope ambiguity / default behavior unclear; answer affects 1-2 IDs | **Should ask** (if question quota allows) |
+| **Tier 4** | Self-Answerable | No ID impact / answerable by re-scanning code | **Do not ask** — convert to EVIDENCE_TARGETED action |
+
+**Sorting rules**:
+- Tier 1 > Tier 2 > Tier 3 (Tier 4 filtered before presentation)
+- Within same Tier: sort by number of affected IDs (descending)
+- Total per round: max 4 (aligned with AskUserQuestion tool limit)
 
 ## 5. Expression Rules
 
@@ -261,6 +312,55 @@ When Gate-B hits max rounds (Standard=2, Full=3), the same 3-choice applies:
 3. Escalate -- get external input, retry (still bounded)
 
 **Risk acceptance constraints**: P0 never acceptable; hard assertion evidence gaps prefer choice 1 or 3; unclear requirements prefer choice 1 or 3.
+
+### 9.3 Post-Baseline Change Rules
+
+After `baseline_accepted = true`, modifications to rfc.md follow the Post-Baseline Change protocol rather than starting a new RFC.
+
+**Change vs New RFC decision criteria**:
+
+| Signal | Post-Baseline Change | New RFC |
+|--------|---------------------|---------|
+| Modify 1-2 sections | ✅ | — |
+| Modify ≥50% sections | — | ✅ |
+| New CHG+DEC count > half of original DEC count | — | ✅ |
+| Overturns §3 goals or §5 core architecture assumptions | — | ✅ |
+| Adds independent functional module (unrelated to existing RFC) | — | ✅ |
+| Supplements missing SCN / adjusts existing DEC | ✅ | — |
+
+**Fallback rule**: When judgment is difficult, the INIT routing AskUserQuestion presents "架构方向调整" option with recommendation: "推荐新建 RFC，原 RFC 保持基线".
+
+**Post-Baseline Change protocol**:
+1. Entry: INIT routing detects `baseline_accepted=true`, user selects "变更已有 RFC"
+2. State transition: `current_phase → "baseline_change"`
+3. DISCOVER-lite: scoped scan of change-affected areas only (not full DISCOVER); compare existing rfc.md vs change request → impact analysis; generate CHG-### (change record) + DEC-### (change decision + rationale)
+4. DESIGN-lite: modify only affected sections/IDs; update linked HR/SCN/DEC for referential integrity; self-check for new Hard-Unresolved introduced by the change
+5. Gate-A → Gate-B → REVIEW (reuse existing phases, no modification)
+6. Approve → baseline updated (`baseline_accepted=true`, `current_phase="finalize"`)
+7. Reject → return to DESIGN-lite (step 4)
+
+**Gate-B strictness for changes**: `max(Standard, original_strictness)`. A Light-mode original RFC is upgraded to Standard for the change Gate-B pass. Full-mode originals remain Full.
+
+**Gate-B review scope for changes**: Gate-B reviews the full rfc.md (changes may have cascading effects), but the reviewer prompt highlights changed sections for focused attention.
+
+**Checkpoint behavior**: Post-Baseline Change flow does NOT use checkpoint/context restart by default (scope is small, context is sufficient). Exception: if change triggers Gate-B FAIL loop, checkpoint/restart logic from the normal flow applies.
+
+**State transition sequence**:
+```
+baseline_accepted=true, current_phase="finalize"
+    ↓ user triggers change
+current_phase="baseline_change"
+    ↓ DISCOVER-lite complete
+current_phase="design"
+    ↓ DESIGN-lite + self-check complete
+current_phase="gate_a"
+    ↓ Gate-A PASS
+current_phase="gate_b"
+    ↓ Gate-B PASS
+current_phase="review"
+    ↓ Approve
+baseline_accepted=true, current_phase="finalize"
+```
 
 ## 10. Parallel & Audit Rules
 

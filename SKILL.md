@@ -9,8 +9,8 @@ description: >
 ---
 
 <!-- skill-meta
-version: 2.7.0
-date: 2026-02-12
+version: 2.9.0
+date: 2026-02-14
 source_rev: git
 -->
 
@@ -83,11 +83,11 @@ Sub-agents (isolated context):
 
 Per-phase delegation:
 - **INIT**: Script (`ohrfc_init.py`). No sub-agent needed.
-- **DISCOVER**: Single `Task(general-purpose)` sub-agent executes QUICK_SCAN + REASONING_PASS + EVIDENCE_TARGETED. Returns structured summary. Orchestrator handles CLARIFY only.
-- **DESIGN**: Single `Task(general-purpose)` sub-agent reads all references + writes complete rfc.md draft. Optional: parallel gap-filling reviewers + 1 merge sub-agent (returns merged draft). Orchestrator writes rfc.md (single-writer).
+- **DISCOVER**: Staged `Task(Explore)` sub-agents: (1) single Explore for QUICK_SCAN + REASONING_PASS (serial), (2) orchestrator handles CLARIFY, (3) 1-3 parallel Explore agents for EVIDENCE_TARGETED (split by target file/module). Fallback: `Task(general-purpose)` if Explore unavailable.
+- **DESIGN**: Single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft (orchestrator writes). Fallback: `Task(general-purpose)` if Plan unavailable. Optional: parallel gap-filling `Task(general-purpose)` reviewers + 1 merge sub-agent.
 - **GATE-A**: Script (`gate_a_check.py`). No sub-agent needed.
 - **GATE-B**: N parallel `Task(general-purpose)` reviewer sub-agents (Map) + 1 reduce sub-agent (Reduce → summary.json). Orchestrator reads summary.json only, applies PASS predicate.
-- **REVIEW Mode B**: Single isolated `Task(general-purpose)` sub-agent for section analysis. Orchestrator relays AskUserQuestion results.
+- **REVIEW Mode B/C**: Single isolated `Task(general-purpose)` sub-agent for section/risk analysis. Orchestrator relays AskUserQuestion results.
 - **FINALIZE**: Single `Task(general-purpose)` sub-agent for export.
 
 ## 2. Default Configuration
@@ -108,9 +108,20 @@ For strictness details and Standard→3-route upgrade triggers, see `references/
 
 **Execution**: Run `scripts/ohrfc_init.py` (no sub-agent needed). Fallback: `references/phase_init.md`.
 
-**Preferred**: Execute `scripts/ohrfc_init.py`:
+**Workspace Routing**: Before creating a new RFC, detect existing workspaces:
 ```bash
-python3 scripts/ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]
+python3 scripts/ohrfc_init.py scan
+```
+- **No workspaces** → proceed directly to new-RFC flow (no AskUserQuestion)
+- **Workspaces found** → AskUserQuestion (single-select):
+  - "新建 RFC" (always present)
+  - "变更已有 RFC: \<id\>" (only if `baseline_accepted=true`) → Post-Baseline Change entry
+  - "继续未完成 RFC: \<id\>" (only if `baseline_accepted=false` AND `current_phase≠init`) → Resume via Bootstrap Protocol
+- **Only "新建 RFC" qualifies** → skip AskUserQuestion, proceed to new-RFC flow
+
+**New-RFC flow** (unchanged):
+```bash
+python3 scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard]
 ```
 
 **Summary**:
@@ -128,12 +139,17 @@ python3 scripts/ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]
 
 **Ref** (sub-agent): `references/phase_discover.md` + `references/discover_assets.md` + `references/methodology.md` §6
 
-**Execution**: Dispatch single `Task(general-purpose)` sub-agent for steps 1, 2, 4. Orchestrator handles step 3 (CLARIFY) only.
+**Execution**: Staged dispatch of Explore sub-agents:
+1. **QUICK_SCAN + REASONING_PASS**: Single `Task(Explore)` sub-agent (serial — REASONING depends on SCAN results). Fallback: `Task(general-purpose)`.
+2. **CLARIFY**: Orchestrator handles (user interaction via AskUserQuestion).
+3. **EVIDENCE_TARGETED**: 1-3 parallel `Task(Explore)` sub-agents (split by hard assertion target files/modules; orchestrator merges EVD into evidence.json). Fallback: `Task(general-purpose)`.
+
+Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGETED (1-3 parallel)`
 
 **Summary** (4 sequential sub-steps; Light mode uses step 1 + step 3 only):
 1. **QUICK_SCAN** [sub-agent]: Glob+Grep+Read bounded codebase scan → fill scan output
 2. **REASONING_PASS** [sub-agent]: sequential-thinking on risks/unknowns → question candidates (skip in Light)
-3. **CLARIFY** [orchestrator]: AskUserQuestion 1 batch of 3-7 decision-style questions (Light: 1 round max) → write to rfc.md as DEC/REQ/SCN/HR
+3. **CLARIFY** [orchestrator]: Tiered questioning — Round 1: Tier 1-2 questions (max 4, mandatory); Round 2: Tier 3 questions (max 4, conditional; Light: Round 1 only, max 3) → write to rfc.md as DEC/REQ/SCN/HR
 4. **EVIDENCE_TARGETED** [sub-agent]: locate evidence for hard assertions → EVD-### in evidence.json (skip in Light)
 
 **Exit**: ≥1 scope/non-goal REQ/DEC, ≥3 HR drafts, ≥3 falsifiable SCN drafts, unknowns graded Hard/Soft. State: current_phase=design. **Checkpoint written** (DISCOVER Exit section).
@@ -144,14 +160,14 @@ python3 scripts/ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]
 
 **Ref** (sub-agent): `references/phase_design.md` + `references/rfc_template.md` + `references/design_assets.md` + `references/methodology.md` §3-8. On demand: `references/security_template.md`
 
-**Execution**: Dispatch single `Task(general-purpose)` sub-agent to write complete rfc.md draft. Orchestrator receives draft, validates self-check, writes state transition.
+**Execution**: Dispatch single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft. Orchestrator receives draft, validates self-check, writes rfc.md + state transition. Fallback: `Task(general-purpose)` if Plan unavailable.
 
 **Summary** (3 steps + optional parallel gap-filling):
 1. **Fill review layer** (§1-§6): background, pain points, goals, TL;DR, solution overview, impact/compatibility
 2. **Fill normative layer** (§7-§11): decisions, security model, reliability, observability, acceptance (5-category SCN)
 3. **Fill gates/appendix** (§12-§16): change log, trigger declarations, release meta, roles + self-check
 
-**Socratic Pause protocol**: Core questions (C1: root problem? C2: still best in 1 year?) + section-fixed questions + context-dynamic questions are embedded at each section's generation point. See `references/phase_design.md` Step 1/2 for the full protocol.
+**Socratic Pause protocol**: Core questions (C1: root problem? C2: still best in 1 year?) + section-fixed questions + context-dynamic questions are embedded at each section's generation point. Includes **emergent fork escalation**: when Socratic Pause reveals an architectural fork with ≤80% confidence, sub-agent returns escalation signal to orchestrator → AskUserQuestion presents fork + trade-offs → user decision resumes design. Max 2 escalations per DESIGN; implementation-level choices stay autonomous. See `references/phase_design.md` Step 1/2 for the full protocol.
 
 **§5.4 API Contract Design**: When the RFC involves public API changes (ArkTS, C/C++ APIs), §5.4 must be filled covering: interface specification, developer model, error codes, versioning strategy, and existing API compatibility.
 
@@ -243,17 +259,19 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 
 ## Phase 6: REVIEW (Human Approval)
 
-**Ref** (Mode B sub-agent): `references/phase_review.md`
+**Ref** (Mode B/C sub-agent): `references/phase_review.md`
 
 **Summary**:
-1. Present rfc.md to user (full or key-section summary)
-2. AskUserQuestion: Approve / Reject (with feedback)
-3. Approve → state: baseline_accepted=true, phase=finalize
-4. Reject → write rejection as DEC/CHG → state: phase=design
+1. **RFC Briefing** (non-interactive): Display concise RFC overview before mode selection — title/scope, TL;DR (3-6 points), key DEC decisions, top HR constraints (≤5), must-pass SCN (≤5), accepted risks
+2. **Mode selection** via AskUserQuestion: Standard / Progressive (推荐) / Interactive
+3. Execute selected mode
+4. Approve → state: baseline_accepted=true, phase=finalize
+5. Reject → write rejection as DEC/CHG → state: phase=design
 
 **Review Modes**:
 - **Mode A: Standard Review** (default) — present rfc.md, binary approve/reject
-- **Mode B: Interactive Review** (user opt-in) — section-by-section walkthrough with isolated sub-agent providing multi-perspective AI analysis (First Principles, Systems Thinking, Adversarial, etc.)
+- **Mode C: Progressive Review** — AI-guided risk-prioritized review with thinking models + Socratic challenges; AI recommends, user decides (recommended for Standard strictness)
+- **Mode B: Interactive Review** — full section-by-section walkthrough with isolated sub-agent providing multi-perspective AI analysis; supports chapter selection + early exit (recommended for Full strictness / high-risk RFCs)
 
 ---
 
@@ -267,6 +285,35 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 3. Lock rfc.md normative content. State: phase=finalize.
 
 **Hard rule**: Post-baseline modification requires: CHG+DEC → Gate-A → Gate-B → re-approval.
+
+---
+
+## Post-Baseline Change
+
+After baseline acceptance (`baseline_accepted=true`, `current_phase="finalize"`), modifications to rfc.md follow the Post-Baseline Change protocol instead of starting a new RFC.
+
+**Entry**: `/ohrfc` → INIT workspace routing detects baselined RFC → user selects "变更已有 RFC: \<id\>"
+
+**Flow**:
+```
+User selects change → scope estimate AskUserQuestion
+    ↓
+├─ "架构方向调整" → recommend new RFC
+├─ "局部修改" / "跨模块变更" → enter change protocol:
+│    DISCOVER-lite (scoped impact analysis) → CHG-### + DEC-###
+│    → DESIGN-lite (modify affected sections only)
+│    → Gate-A → Gate-B (strictness ≥ Standard) → REVIEW → Approve
+```
+
+**Key rules**:
+- Gate-B strictness = `max(Standard, original_strictness)` (Light originals upgrade to Standard)
+- Gate-B reviews full rfc.md (cascading effects); reviewer prompt marks changed sections
+- No checkpoint/context restart unless Gate-B FAIL loop triggers it
+- Change vs New RFC criteria: see `references/methodology.md` §9.3
+
+**State transitions**: `finalize → baseline_change → design → gate_a → gate_b → review → finalize`
+
+**Ref**: `references/phase_review.md` §Post-Baseline Change Flow, `references/methodology.md` §9.3
 
 ---
 

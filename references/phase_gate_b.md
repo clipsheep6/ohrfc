@@ -59,7 +59,8 @@ Update state.json: `gate_b_result: "skip"`, `current_phase: "review"`.
 **Steps 1-2** [reduce sub-agent]: Dispatch `Task(general-purpose)` sub-agent to merge reviewer reports.
 
 1. Read all role reports from `.reviews/gateb/round-{N}/`
-2. Merge into `.reviews/summary.json` (per `schemas/review_summary.schema.json`):
+2. Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) to resolve cross-report conflicts: contradictory severity ratings, overlapping findings with different recommendations, and coverage gap identification across roles.
+3. Merge into `.reviews/summary.json` (per `schemas/review_summary.schema.json`):
    - Aggregate P0/P1/P2 issues
    - Generate `required_actions` (each: Location + specific Edit — no vague "improve/enhance")
    - Record `role_votes: {role: pass|fail}`
@@ -86,6 +87,11 @@ Write summary.json. Update state.json: `gate_b_result: "pass"`, `current_phase: 
   - (b) Scope cut — remove features causing failure
   - (c) Risk acceptance — DEC with residual risk + mitigation + tracking
   Write choice as DEC-###.
+
+  **State transitions per choice**:
+  - (a) Auto-fix → `gate_b_round += 1`, `current_phase: "design"`. After DESIGN fix → `current_phase: "gate_a"` → normal gate flow.
+  - (b) Scope cut → `current_phase: "design"`. Re-enter DESIGN to remove scoped features, then re-run Gate-A → Gate-B.
+  - (c) Risk acceptance → Write DEC-### with risk acceptance fields. Re-evaluate PASS predicate with the DEC in place: if all 6 conditions now satisfied → `gate_b_result: "pass"`, `current_phase: "review"`; if still failing → `current_phase: "design"` (further fixes needed).
 
 - **Max rounds reached** → Force convergence (per methodology.md §9). AskUserQuestion with 3 choices:
   1. Scope cut — remove features causing failure

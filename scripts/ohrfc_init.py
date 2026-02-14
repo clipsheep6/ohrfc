@@ -4,11 +4,15 @@
 Creates workspace, rfc.md skeleton, evidence.json, and state.json.
 
 Usage:
-    python3 ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard] [--skill-dir <path>]
+    python3 ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard] [--skill-dir <path>]
+    python3 ohrfc_init.py scan
+    python3 ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]  # backward compat
 
 Examples:
-    python3 scripts/ohrfc_init.py rfc-20260211-auth-model "认证模型重构"
-    python3 scripts/ohrfc_init.py rfc-20260211-auth-model "认证模型重构" --strictness full
+    python3 scripts/ohrfc_init.py create rfc-20260211-auth-model "认证模型重构"
+    python3 scripts/ohrfc_init.py create rfc-20260211-auth-model "认证模型重构" --strictness full
+    python3 scripts/ohrfc_init.py scan
+    python3 scripts/ohrfc_init.py rfc-20260211-auth-model "认证模型重构"  # backward compat
 """
 
 import argparse
@@ -176,25 +180,91 @@ def validate_state_against_schema(state: dict, skill_dir: Path) -> list[str]:
     return errors
 
 
+def scan_workspaces() -> list[dict]:
+    """Scan .ohrfc/ for existing workspaces and return status info."""
+    ohrfc_dir = Path(".ohrfc")
+    if not ohrfc_dir.exists():
+        return []
+
+    results = []
+    for entry in sorted(ohrfc_dir.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        state_path = entry / "state.json"
+        if not state_path.exists():
+            continue
+        try:
+            state = json.loads(state_path.read_text(encoding="utf-8"))
+            results.append({
+                "rfc_id": state.get("rfc_id", entry.name),
+                "current_phase": state.get("current_phase", "unknown"),
+                "strictness": state.get("strictness", "unknown"),
+                "baseline_accepted": state.get("baseline_accepted", False),
+                "gate_b_round": state.get("gate_b_round", 0),
+                "checkpoint_version": state.get("checkpoint_version", 0),
+            })
+        except (json.JSONDecodeError, OSError):
+            results.append({
+                "rfc_id": entry.name,
+                "current_phase": "error",
+                "strictness": "unknown",
+                "baseline_accepted": False,
+                "gate_b_round": 0,
+                "checkpoint_version": 0,
+            })
+    return results
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="OHRFC INIT phase: create workspace and skeleton files"
     )
-    parser.add_argument("rfc_id", help="RFC identifier (e.g. rfc-20260211-auth-model)")
-    parser.add_argument("rfc_title", help="RFC title (Chinese or English)")
-    parser.add_argument(
+    subparsers = parser.add_subparsers(dest="command")
+
+    # Subcommand: scan
+    subparsers.add_parser("scan", help="Scan existing workspaces and report status")
+
+    # Subcommand: create (default behavior)
+    create_parser = subparsers.add_parser("create", help="Create a new RFC workspace")
+    create_parser.add_argument("rfc_id", help="RFC identifier (e.g. rfc-20260211-auth-model)")
+    create_parser.add_argument("rfc_title", help="RFC title (Chinese or English)")
+    create_parser.add_argument(
         "--strictness",
         choices=["light", "standard", "full"],
         default="standard",
         help="Strictness level (default: standard)",
     )
-    parser.add_argument(
+    create_parser.add_argument(
         "--skill-dir",
         default=None,
         help="Path to skill root directory (auto-detected if omitted)",
     )
+
     args = parser.parse_args()
 
+    # Default to create if positional args look like rfc_id (backward compat)
+    if args.command is None:
+        # Backward compatibility: re-parse as create command
+        create_parser_compat = argparse.ArgumentParser(
+            description="OHRFC INIT phase: create workspace and skeleton files"
+        )
+        create_parser_compat.add_argument("rfc_id", help="RFC identifier")
+        create_parser_compat.add_argument("rfc_title", help="RFC title")
+        create_parser_compat.add_argument(
+            "--strictness",
+            choices=["light", "standard", "full"],
+            default="standard",
+        )
+        create_parser_compat.add_argument("--skill-dir", default=None)
+        args = create_parser_compat.parse_args()
+        args.command = "create"
+
+    if args.command == "scan":
+        workspaces = scan_workspaces()
+        print(json.dumps(workspaces, ensure_ascii=False, indent=2))
+        return
+
+    # --- create command (original logic, unchanged) ---
     # Resolve paths
     skill_dir = find_skill_dir(args.skill_dir)
     workspace = Path(f".ohrfc/{args.rfc_id}")

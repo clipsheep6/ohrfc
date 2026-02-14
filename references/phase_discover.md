@@ -14,12 +14,17 @@ The orchestrator does NOT read these files. It dispatches the sub-agent and hand
 
 ## Sub-step 1: QUICK_SCAN (5-10s, no user interaction)
 
-**Execution**: Launch as `Task(Explore)` sub-agent. Model inherits from orchestrator by default; user can override at INIT.
+**Execution**: Launch as `Task(Explore)` sub-agent. Fallback: `Task(general-purpose)` if Explore unavailable. Model inherits from orchestrator by default; user can override at INIT.
 
 Execute bounded codebase scan:
 
-1. **Glob**: Find entry files (API/IPC/service stubs/external interface declarations). Limit: 200 paths max.
-2. **Grep**: Search requirement keywords (feature name, setting name, error code, module name). Limit: topk=50.
+1. **Code symbol search** (entry points, API/IPC declarations, class/function definitions):
+   - Prefer: `mcp__serena__find_symbol` / `mcp__serena__get_symbols_overview` for AST-level precision.
+   - Fallback: Grep (if serena unavailable).
+   - Glob: Find entry files (API/IPC/service stubs/external interface declarations). Limit: 200 paths max.
+2. **Text/config search** (requirement keywords, error codes, config keys):
+   - Prefer: Grep. Search requirement keywords (feature name, setting name, error code, module name). Limit: topk=50.
+   - Fallback: `mcp__serena__search_for_pattern` (for complex multi-line patterns).
 3. **Read**: Key entry files (max 5 files, 200 lines each).
 4. Fill QUICK_SCAN output fields (from discover_assets.md §1):
    - `scan.repo_rev`, `scan.layout`, `scan.entrypoints`, `scan.keywords`, `scan.suspicions`
@@ -44,8 +49,28 @@ Apply these lenses during reasoning:
    - `risks.top` (3-7 items, each: status/consequence/trigger/suggested SCN category)
    - `unknowns.hard` / `unknowns.soft`
    - `strictness_recommendation`
-   - Question candidates (4-field format: Evidence/Why/Options/Output)
-4. Filter: Delete questions solvable by "scan code again" → convert to EVIDENCE_TARGETED actions.
+   - Question candidates (4-field format: Evidence/Why/Options/Output), generated via the **Question Generation Pipeline**:
+
+#### Question Generation Pipeline
+
+Run four generators sequentially, then merge results:
+
+| Generator | Input | Output | Example |
+|-----------|-------|--------|---------|
+| **A: Contradiction Detector** | QUICK_SCAN findings vs requirements | Tier 1 questions | "Code caps at 100 connections, but requirement says unlimited clients" |
+| **B: Missing Constraint Discoverer** | Coverage Checklist (discover_assets.md §4) vs requirements | Tier 1-2 questions | "No failure recovery strategy mentioned; code does X — keep or change?" |
+| **C: Fork Point Identifier** | REASONING analysis → ≥2 valid approaches | Tier 2 questions | "Pull vs Push model: Pull saves resources but adds latency — which?" |
+| **D: Assumption Exposer** | must/always/never in requirements + EVD gap check | Tier 2-3 questions | "'Must support X' — from spec/compliance/experience? If preference, can downgrade to recommended" |
+
+```
+QUICK_SCAN output + user requirements
+    ↓
+Contradiction Detector → Missing Constraint Discoverer → Fork Point Identifier → Assumption Exposer
+    ↓
+Merge + deduplicate → Tier priority sort (see methodology.md §4.2) → Top questions
+```
+
+4. Filter: Tier 4 questions (self-answerable) → convert to EVIDENCE_TARGETED actions. Remaining questions sorted by Tier (1>2>3), then by affected ID count (descending).
 
 **Progress report**: After REASONING_PASS, report to user: "Analysis complete — {N} risks identified, {M} unknowns ({H} hard, {S} soft), recommending strictness: {level}."
 
@@ -53,11 +78,18 @@ Apply these lenses during reasoning:
 
 1. Show user QUICK_SCAN one-screen summary: confirmed facts + risk signals + strictness recommendation.
 2. **Recommendation Pause** (for each question with a recommended option):
+   - Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) to challenge each recommendation:
    - **Socratic**: "What specific project-context reason supports this recommendation?"
    - **Steelman**: "What's the strongest argument for the option I'm NOT recommending?"
    - Survive: concrete reason exists → keep "(推荐)". Weak reasoning → present neutrally.
-3. AskUserQuestion: 1 batch of 3-7 decision-style questions (A/B/C + consequences per option).
-   - Each question: Evidence anchor + Why asking + Options + Which IDs affected
+3. **Tiered Questioning** (aligned with AskUserQuestion tool limit: max 4 questions per call):
+   - **Round 1 (mandatory)**: Tier 1-2 questions, max 4 per AskUserQuestion call.
+     - Each question: Evidence anchor + Why asking + Options (2-4) + Which IDs affected
+     - If Tier 1-2 ≤ 4 and no remaining Tier 3: CLARIFY complete after Round 1.
+   - **Round 2 (conditional)**: Tier 3 questions, max 4 per AskUserQuestion call.
+     - Triggered only when: Tier 3 questions exist AND mode is not Light.
+     - Light mode: Round 1 only, max 3 questions total.
+   - **Limits**: Standard/Full = max 2 rounds × 4 = 8 questions. Light = 1 round × 3 questions.
 4. Write answers to rfc.md as DEC/REQ/SCN/HR.
 5. Non-blocking unknowns → Soft-Unresolved with owner + follow-up action.
 
@@ -69,7 +101,10 @@ Apply these lenses during reasoning:
    - Numbers/limits/thresholds/timeouts
    - "must/forbidden/never/always/only" in boundary/permission/trust context
    - Current-state facts constraining design
-2. For each hard assertion → Grep+Read to locate evidence:
+2. For each hard assertion → locate evidence using appropriate search strategy:
+   - **Code symbols** (function/class/interface definitions constraining the assertion): prefer `mcp__serena__find_symbol` / `mcp__serena__get_symbols_overview`. Fallback: Grep.
+   - **Text/config** (literal values, error codes, config keys): prefer Grep. Fallback: `mcp__serena__search_for_pattern`.
+   - Then Read source to confirm:
    - Record EVD-### in evidence.json (per methodology.md §6 field requirements)
    - **Anti-confirmation-bias**: Also search for evidence that CONTRADICTS the assertion. If contradicting evidence is found, surface it as a risk in rfc.md (Unresolved or DEC).
 3. Insufficient evidence → write Unresolved/DEC in rfc.md
@@ -88,7 +123,7 @@ When enabled by user (explicit request or configuration):
 ## Parallel Optimization
 
 When multiple hard assertions target different files/modules, launch parallel evidence searches:
-- Use `Task(Explore)` sub-agents (max 3) for independent evidence hunts
+- Use `Task(Explore)` sub-agents (max 3) for independent evidence hunts. Fallback: `Task(general-purpose)` if Explore unavailable.
 - Each sub-agent: Grep+Read within a bounded file set → return EVD candidate
 - Orchestrator merges EVD candidates into evidence.json (single-writer)
 - Constraint: total parallel + sequential reads ≤ 15 files per round
