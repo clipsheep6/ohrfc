@@ -16,7 +16,7 @@ The orchestrator dispatches the sub-agent and validates the returned draft again
 
 ## Quality Bar
 
-> **Your output will be strictly cross-reviewed by multiple independent AI models.**
+> **Your output will be strictly cross-reviewed by multiple independent AI models, including Codex.**
 >
 > The rfc.md draft you produce will go through:
 > 1. **Gate-A**: 20 automated mechanical checks (17 HARD blockers + 3 SOFT warnings) — structural compliance, ID uniqueness, expression format, SCN coverage, evidence cross-references, impact table dimensions, diagram type coverage, compatibility dimensions
@@ -27,7 +27,7 @@ The orchestrator dispatches the sub-agent and validates the returned draft again
 > **Get it right the first time.** Treat every SCN expression format, every ID cross-reference, every evidence citation, and every section completeness requirement as non-negotiable. When in doubt, refer to `methodology.md` for the exact rules rather than guessing.
 
 **If entering from Gate-A FAIL (fix cycle)**:
-Orchestrator dispatches `Task(general-purpose)` sub-agent with Gate-A failure list + current rfc.md. Sub-agent fixes ONLY failing items, runs `gate_a_check.py --dry-run` to verify, and **returns the complete fixed rfc.md content** — not analysis or recommendations. Orchestrator writes the returned content.
+Orchestrator dispatches `Task(general-purpose)` sub-agent with Gate-A failure list + current rfc.md. Sub-agent follows **Batch Edit Protocol** (read once → analyze all → group edits → execute minimally → verify once with formal `gate_a_check.py`). Returns Gate-A PASS confirmation. Orchestrator trusts result and updates state directly.
 
 **If entering from Gate-B FAIL (context restart)**:
 Orchestrator executes Bootstrap Protocol from `references/checkpoint_protocol.md` §4. Provides checkpoint.md content in sub-agent prompt as reasoning context from previous phases. Sub-agent **must return the complete fixed rfc.md content** — not analysis or recommendations. The single-writer principle means the orchestrator writes rfc.md, but the sub-agent must produce the full document ready to write.
@@ -64,6 +64,8 @@ At each section, the sub-agent MUST pause and answer internally:
 | strictness=Full | "Under Full strictness, does this DEC need an option set (≥2 alternatives)?" | When writing DEC |
 | Security / trust boundary change in DISCOVER | "Trust boundary change → do we need SEC-HR + reject/abuse SCN?" | Before writing §8, check DISCOVER findings |
 | Compatibility risk in DISCOVER | "Is the default value strategy explicit? Is old behavior explicitly preserved?" | Before writing §6, check DISCOVER findings |
+| §5 中出现方法/类名 | "Could a developer achieve the same external behavior with a different class/method name? If yes, abstract to functional role." | 编写 §5.1/§5.3 时 |
+| §5.2 中出现同步原语 | "Is this a concurrency REQUIREMENT (no data race) or an implementation CHOICE (use mutex)? Only the former belongs." | 编写 §5.2 时 |
 
 #### Emergent Fork Escalation
 
@@ -112,21 +114,35 @@ Only proceed to write after all Pause questions are answered satisfactorily (inc
   - **Pause**: "Are these conclusions decidable? Can someone say YES/NO to each?"
   - Write: 3-6 decidable conclusions + impact table + must-pass SCN set + quality closure summary + reading guide
 
+- §7 关键决策:
+  - **Pause per DEC**: "Why this over the 2nd best? What's the strongest counterargument?"
+  - Write: DEC-### with alternatives + rationale + trade-offs; Unresolved table (Hard/Soft)
+
 - §5 方案概览:
   - **Pause**: "Is this the simplest design that satisfies ALL constraints?"
   - Write: End-to-end main path + contracts + design diagrams (A: architecture/boundary, B: interaction sequence, C: failure/convergence) + Notes per diagram
+
+  **§5 抽象层级规则**:
+  设计文档定义行为契约和性能边界，不预设实现方式。
+
+  ❌ "模块 A 调用 ModuleB.getData() 获取 vector<pair<int, shared_ptr<Channel>>>"
+  ✅ "数据分发层通过客户端映射服务按标识查询对应通道"
+
+  ❌ "通过 mutex 保护内部状态"
+  ✅ "内部状态并发访问安全（无数据竞争）"
+
+  ❌ "使用 unordered_map 实现 O(1) 查询"
+  ✅ "O(1) 查询复杂度（如通过哈希表实现）"
 
 - §6 影响分析与兼容性:
   - **Pause**: "What downstream change triggers a cascade we haven't mapped?"
   - Write: Unchanged/changed/default strategy + breaking changes + rollback + evidence spot-checks
 
-## Step 2: Fill Normative Layer (rfc.md §7-§11)
+## Step 2: Fill Normative Layer (rfc.md §8-§11)
+
+> **Cross-Section Deduplication**: Before writing §8/§9/§11, check if the constraint/scenario is already expressed in §5.2 (contracts) or §7 (decisions). If so, write a back-reference ('see DEC-###') instead of re-expressing the full logic. Each behavioral fact should have ONE authoritative location; other sections link to it.
 
 Same Socratic Pause Protocol applies (Core C1+C2 + Section-fixed + Context-dynamic).
-
-- §7 关键决策:
-  - **Pause per DEC**: "Why this over the 2nd best? What's the strongest counterargument?"
-  - Write: DEC-### with alternatives + rationale + trade-offs; Unresolved table (Hard/Soft)
 
 - §8 安全模型:
   - **Pause**: "What's the cheapest attack with highest impact we haven't covered?"
@@ -194,20 +210,20 @@ Run template §16.2 self-check (11 items), then these 6 additional checks:
 All passed → Update state.json: `current_phase → "gate_a"`
 Any failed → Fix and re-check (do NOT enter GATE)
 
-## Pre-Gate Dry-Run (mandatory)
+## Integrated Gate-A Check (mandatory)
 
-After self-check passes, run Gate-A in advisory mode. This step is **mandatory** — the sub-agent must not return the draft to the orchestrator until dry-run passes:
+After self-check passes, run formal Gate-A inside the DESIGN sub-agent:
 
 ```bash
-python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json --dry-run
+python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json
 ```
 
-- If WOULD_PASS: proceed to Checkpoint Write → state transition
-- If WOULD_FAIL: fix failing items (same as self-check fix loop), re-run dry-run
-- **Loop until WOULD_PASS** — do NOT return a draft that would fail Gate-A
-- Dry-run failures do NOT trigger state transition to gate_a; they are advisory only
+- If PASS: capture output → proceed to Checkpoint Write → return rfc.md + Gate-A output to orchestrator
+- If FAIL: fix failing items (following Batch Edit Protocol), re-run until PASS
+- **Loop until PASS** — do NOT return a draft that fails Gate-A
+- Orchestrator receives PASS result → updates state.json directly (gate_a_result: "pass", current_phase: "gate_b"), skips redundant re-run
 
-This step eliminates DESIGN→GATE-A round-trips by catching all structural/mechanical issues before the formal gate.
+This eliminates the double-execution pattern (dry-run + formal) while preserving audit integrity through the Gate-A output attached to the return.
 
 ## Checkpoint Write (after self-check passed)
 

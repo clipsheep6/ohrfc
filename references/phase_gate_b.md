@@ -113,13 +113,21 @@ Sub-agent prompt template:
 You are a DESIGN fix agent. Gate-B semantic review has identified the following issues:
 {summary_json_required_actions}
 
-Fix these issues in rfc.md. For each required_action:
-- Apply the specific edit at the indicated location
-- Ensure the fix doesn't break other sections (cross-reference check)
-- Run gate_a_check.py --dry-run to verify structural integrity after fixes
+## Batch Edit Protocol
+1. **Read rfc.md ONCE** (full file) — do NOT re-read sections individually
+2. **Analyze ALL required_actions together** — plan every edit before making any change
+3. **Group edits by section** — changes to the same § should be a single Edit call
+4. **Cross-reference check**: after planning all edits, verify they don't conflict with each other
+5. **Execute edits** — apply all changes with minimal tool calls
+6. **Verify ONCE** — run gate_a_check.py after ALL edits, not after each individual edit
+7. If verification fails, apply targeted fixes and re-verify (do NOT re-read full file)
 
-CRITICAL: Return the COMPLETE fixed rfc.md content. Do NOT return analysis or recommendations.
-The orchestrator will write your output directly to rfc.md.
+For each required_action:
+- Apply the specific edit at the indicated location
+- Ensure consistency with surrounding sections
+
+CRITICAL: After all edits pass gate_a_check.py, return confirmation with the Gate-A PASS output.
+The orchestrator will trust the result and update state directly.
 
 Your output will be strictly cross-reviewed by Codex and other models in the next Gate-B round.
 Ensure every fix is precise and complete to avoid another rejection cycle.

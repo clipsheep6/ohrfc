@@ -120,15 +120,22 @@ When enabled by user (explicit request or configuration):
 - All external evidence → evidence.json with additional fields: `source_type: "external"`, `url`, `date`, `scope` (per methodology.md §6 external source requirements).
 - External sources complement but do not replace codebase evidence for hard assertions.
 
-## Parallel Optimization
+## Evidence Collection Model (Two-Phase)
 
-When multiple hard assertions target different files/modules, launch parallel evidence searches:
-- Use `Task(Explore)` sub-agents (max 3) for independent evidence hunts. Fallback: `Task(general-purpose)` if Explore unavailable.
-- Each sub-agent: Grep+Read within a bounded file set → return EVD candidate
-- Orchestrator merges EVD candidates into evidence.json (single-writer)
-- Constraint: total parallel + sequential reads ≤ 15 files per round
+**Phase A — Search** (parallel):
+- 1-3 `Task(Explore)` sub-agents search code for hard assertion evidence (split by target files/modules)
+- Each sub-agent: Grep+Read within a bounded file set → return EVD candidate (structured: evd_id, locator, summary, confidence, links_to)
+- Constraint: total reads ≤ 15 files per round
 
-**Note**: Evidence gathering can be parallelized via sub-agents. The orchestrator dispatches independent search tasks and merges results, maintaining single-writer discipline on evidence.json.
+**Phase B — Write** (single agent):
+- 1 `Task(general-purpose)` sub-agent receives all EVD candidates from Phase A
+- Formats and writes evidence.json directly (per methodology.md §6 field requirements)
+- Returns EVD summary (id + confidence + links_to per item) to orchestrator
+- Orchestrator updates state.json only — no evidence merge step
+
+**Rationale**: Separating search (parallel Explore) from write (single general-purpose) preserves parallel search speed while eliminating orchestrator merge overhead. Threshold avoids unnecessary agent invocation for small evidence sets.
+
+**Threshold rule**: If Explore agents return ≤5 EVD candidates total, orchestrator merges directly (lightweight JSON assembly). If >5 candidates, dispatch general-purpose writer agent.
 
 ## Exit Conditions (all must be satisfied)
 

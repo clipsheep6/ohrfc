@@ -44,7 +44,13 @@ Workspace: `.ohrfc/<rfc_id>/` containing `rfc.md`, `evidence.json`, `state.json`
 ## 1. Execution Principles
 
 1. **Thin Orchestrator**: The main window (orchestrator) NEVER reads phase-specific reference files directly and NEVER executes codebase exploration tools (Glob/Grep/Read). It only dispatches sub-agents, handles user interaction (AskUserQuestion), writes artifacts (rfc.md/evidence.json/state.json), and manages state transitions. All phase reference reads and heavy tool execution happen inside sub-agents whose context is isolated from the main window. **Exception**: `references/methodology.md` is loaded once by the orchestrator at workflow start — it provides the foundational design philosophy and rules needed for orchestration decisions (convergence, checkpoint extraction, artifact formatting).
-2. **Single-writer**: only the main orchestrator writes `rfc.md`, `evidence.json`, `state.json`. Sub-agents write isolated outputs only (`.reviews/`, return values).
+1b. **Delegated Artifact Writes**: Sub-agents may write artifacts directly when they are the sole writer in that phase. The orchestrator manages state transitions (state.json) and coordinates phases, but does not redundantly re-write artifacts already written by sub-agents. Specifically:
+   - `evidence.json`: written by designated EVIDENCE_TARGETED sub-agent (Change 1)
+   - `rfc.md` (fix cycles): edited directly by fix sub-agents via Edit tool; orchestrator does not overwrite (Change 4)
+   - `rfc.md` (initial DESIGN): returned by DESIGN sub-agent, written by orchestrator (unchanged)
+   - `state.json`: always written by orchestrator (unchanged)
+   - Gate-A execution: run by sub-agent internally, result trusted by orchestrator (Change 3)
+2. **Single-writer**: only the main orchestrator writes `rfc.md`, `state.json`. `evidence.json` writing is delegated to a designated `Task(general-purpose)` sub-agent during EVIDENCE_TARGETED phase. Other sub-agents write isolated outputs only (`.reviews/`, return values).
 3. **rfc.md is the sole normative truth**: any conclusion from gates/reviews/evidence must be written back to rfc.md as DEC/REQ/SCN/CHG.
 4. **No implementation code in rfc.md**: only contract-level structured expressions (fenced blocks with `text` or `contract` language tag, ≤30 lines).
 5. **Language**: user interaction follows user's language (default Chinese). Internal reasoning, sub-agent prompts, and code comments in English.
@@ -78,12 +84,12 @@ Orchestrator (main window):
 
 Sub-agents (isolated context):
   Read reference files → execute tools → reason → return structured result
-  NEVER: AskUserQuestion | write rfc.md/evidence.json/state.json
+  NEVER: AskUserQuestion | write rfc.md/state.json (evidence.json: delegated to EVIDENCE_TARGETED writer sub-agent only)
 ```
 
 Per-phase delegation:
 - **INIT**: Script (`ohrfc_init.py`). No sub-agent needed.
-- **DISCOVER**: Staged `Task(Explore)` sub-agents: (1) single Explore for QUICK_SCAN + REASONING_PASS (serial), (2) orchestrator handles CLARIFY, (3) 1-3 parallel Explore agents for EVIDENCE_TARGETED (split by target file/module). Fallback: `Task(general-purpose)` if Explore unavailable.
+- **DISCOVER**: Staged sub-agents: (1) single `Task(Explore)` for QUICK_SCAN + REASONING_PASS (serial), (2) orchestrator handles CLARIFY, (3) EVIDENCE_TARGETED two-phase: 1-3 parallel `Task(Explore)` agents search code and return EVD candidates → 1 `Task(general-purpose)` agent receives candidates and writes evidence.json directly. Orchestrator updates state.json only.
 - **DESIGN**: Single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft (orchestrator writes). Fallback: `Task(general-purpose)` if Plan unavailable. Optional: parallel gap-filling `Task(general-purpose)` reviewers + 1 merge sub-agent.
 - **GATE-A**: Script (`gate_a_check.py`). No sub-agent needed.
 - **GATE-B**: N parallel `Task(general-purpose)` reviewer sub-agents (Map) + 1 reduce sub-agent (Reduce → summary.json). Orchestrator reads summary.json only, applies PASS predicate.
@@ -142,7 +148,7 @@ python3 scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard
 **Execution**: Staged dispatch of Explore sub-agents:
 1. **QUICK_SCAN + REASONING_PASS**: Single `Task(Explore)` sub-agent (serial — REASONING depends on SCAN results). Fallback: `Task(general-purpose)`.
 2. **CLARIFY**: Orchestrator handles (user interaction via AskUserQuestion).
-3. **EVIDENCE_TARGETED**: 1-3 parallel `Task(Explore)` sub-agents (split by hard assertion target files/modules; orchestrator merges EVD into evidence.json). Fallback: `Task(general-purpose)`.
+3. **EVIDENCE_TARGETED**: 1-3 parallel `Task(Explore)` sub-agents search code → 1 `Task(general-purpose)` sub-agent writes evidence.json directly from EVD candidates. Orchestrator updates state.json only — no merge step.
 
 Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGETED (1-3 parallel)`
 
@@ -150,7 +156,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 1. **QUICK_SCAN** [sub-agent]: Glob+Grep+Read bounded codebase scan → fill scan output
 2. **REASONING_PASS** [sub-agent]: sequential-thinking on risks/unknowns → question candidates (skip in Light)
 3. **CLARIFY** [orchestrator]: Tiered questioning — Round 1: Tier 1-2 questions (max 4, mandatory); Round 2: Tier 3 questions (max 4, conditional; Light: Round 1 only, max 3) → write to rfc.md as DEC/REQ/SCN/HR
-4. **EVIDENCE_TARGETED** [sub-agent]: locate evidence for hard assertions → EVD-### in evidence.json (skip in Light)
+4. **EVIDENCE_TARGETED** [Explore → general-purpose]: Explore agents locate evidence → general-purpose agent writes EVD-### to evidence.json directly → returns summary (skip in Light)
 
 **Exit**: ≥1 scope/non-goal REQ/DEC, ≥3 HR drafts, ≥3 falsifiable SCN drafts, unknowns graded Hard/Soft. State: current_phase=design. **Checkpoint written** (DISCOVER Exit section).
 
@@ -184,7 +190,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Self-check** (must pass before GATE): Run template §16.2 (11 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
 
-**Pre-Gate Dry-Run**: Mandatory `gate_a_check.py --dry-run` before formal gate entry. Sub-agent must run dry-run, fix any failures, and re-run until WOULD_PASS before returning the draft to orchestrator.
+**Integrated Gate-A**: Sub-agent runs formal `gate_a_check.py` (no --dry-run) internally, fixes failures and re-runs until PASS. Returns rfc.md + Gate-A PASS output to orchestrator. Orchestrator trusts result, updates state directly (gate_a_result: "pass", current_phase: "gate_b") — no redundant re-run.
 
 **Exit**: Self-check passed. State: current_phase=gate_a. **Checkpoint written** (DESIGN Exit section).
 
@@ -193,6 +199,8 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 ## Phase 4: GATE-A (Mechanical Check)
 
 **Execution**: Run `scripts/gate_a_check.py` directly (no sub-agent needed). Fallback: `references/phase_gate_a.md`.
+
+**Fast Path**: If DESIGN sub-agent already ran formal `gate_a_check.py` and returned PASS result, orchestrator skips re-execution, directly updates state.json. Falls through to normal execution only if no sub-agent result is available.
 
 **Summary**: Run 20 deterministic checks on rfc.md structure and auditability. 3-state output per check: PASS / WARN / FAIL.
 
