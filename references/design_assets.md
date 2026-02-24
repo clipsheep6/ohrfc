@@ -73,3 +73,15 @@ EVD-001
 - Light/Standard: 2-column comparison table (3-5 rows) + 1-sentence conclusion. Details go to HR/SCN/Unresolved.
 - Keep only differentiating dimensions; delete rows where columns agree (noise reduction).
 - Full: 2-3 options mandatory; single option requires DEC explaining "why no viable alternatives".
+
+## 6. Authoritative Location Table
+
+> Each type of information has ONE authoritative section. Other sections reference it by ID, not re-express it.
+
+| 信息类型 | 权威章节 | 其他章节的写法 |
+|---|---|---|
+| 行为契约（默认值、非法输入、作用域） | §5.2 | §11 测试它, §6 评估影响 |
+| 设计理由 / 取舍 | §7 DEC-### | §8/§9 可引用 ID，不重述 |
+| 安全/可靠性约束 | §8/§9 HR-### | §11 SCN 测试它 |
+| 证据 | evidence.json | 引用 EVD-### ID，不在 rfc.md 复制完整条目 |
+| 必须通过集合 | §11 SCN 标签 | §4.3 从标签派生 |

@@ -86,6 +86,8 @@ Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) to ap
 | Systems Thinking | "跨系统耦合和反馈回路？" | Cross-boundary dependencies, emergent behaviors |
 | Future Look-back | "2 年后这些决策还成立吗？" | Assumption expiry, scalability limits |
 | Socratic Challenge | "我们在解决症状还是根因？" | Root cause vs symptom fixes |
+| Brevity | "如果删除这个章节，是否有规范性信息丢失？" | Sections where >80% restates other sections |
+| Abstraction | "§5 描述的是系统做什么和为什么，还是怎么实现的？" | §5 class names, method signatures, sync primitives |
 
 Output: **Risk-sorted Focus Items list**, each containing:
 - `location`: section + ID (e.g., "§5 DEC-003")

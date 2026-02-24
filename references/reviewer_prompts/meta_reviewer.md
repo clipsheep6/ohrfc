@@ -12,6 +12,8 @@ You do NOT review domain-specific details (that's handled by Architect, Security
 4. **Completeness vs Complexity**: Is every section earning its complexity? Could any section be simplified without losing safety guarantees?
 5. **Cross-Section Consistency**: Do §5 (solution), §7 (decisions), §8-9 (security/reliability), and §11 (acceptance) tell a single coherent story?
 6. **Blind Spot Inversion**: What systemic issue would ALL three domain reviewers miss? What assumption do Architect, Security, and QA all share that might be wrong?
+7. **Redundancy Check (P2)**: Identify cases where the same behavioral spec, constraint, or evidence reference is expressed in full in 3+ locations. Recommend consolidation to authoritative location + back-references. Note: cross-referencing by ID (e.g., 'see DEC-###') is expected and correct; only flag verbatim duplication of normative text.
+8. **Implementation Leakage Check (P2)**: Flag design sections (§5) that prescribe specific class names, method signatures, language-specific container types, or synchronization primitives. These constrain developer autonomy without design justification. Should be expressed as behavioral contracts and performance bounds instead.
 
 ## Severity Definitions (MANDATORY — apply these exactly)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gate-A: Structural validation for rfc.md (20 checks: 17 HARD + 3 SOFT).
+Gate-A: Structural validation for rfc.md (22 checks: 17 HARD + 5 SOFT).
 
 HARD checks (block progression):
 1. Structure completeness (required sections)
@@ -25,6 +25,8 @@ SOFT checks (WARNING only, do not block):
 18. Diagram-text pairing (mermaid blocks have nearby prose)
 19. Unresolved format (Hard-Unresolved items have owner/action/convergence)
 20. Orphan SCN (SCN not referenced by any HR or must-pass set)
+21. Cross-section redundancy (same EVD/HR text duplicated across sections)
+22. §5 implementation detail (class names, method signatures, sync primitives in design)
 
 Usage:
     python3 gate_a_check.py <rfc.md> [--evidence <evidence.json>] [--template <template.md>] [--dry-run]
@@ -35,7 +37,7 @@ Exit codes:
     1 - FAIL (any hard check failed)
 
 Dry-run mode (--dry-run):
-    Runs all 20 checks in advisory mode. Output is prefixed with [DRY-RUN].
+    Runs all 22 checks in advisory mode. Output is prefixed with [DRY-RUN].
     Final line shows DRY-RUN RESULT: WOULD_PASS or DRY-RUN RESULT: WOULD_FAIL (N HARD failures).
     Exit code is always 0 (advisory, not blocking).
 """
@@ -1244,6 +1246,113 @@ def check_20_orphan_scn(rfc: str) -> CheckResult:
     return r
 
 
+# === SOFT CHECKS 21-22 ===
+
+def check_21_cross_section_redundancy(rfc: str, evidence: dict) -> CheckResult:
+    """Check 21 (SOFT): Cross-section redundancy detection."""
+    r = CheckResult("21. Cross-section redundancy", kind="soft")
+
+    # Split rfc into top-level sections (## headings)
+    sections = _split_into_sections(rfc)
+
+    # Part 1: EVD full-context duplication across 3+ sections
+    evd_pattern = re.compile(r'(EVD-\d{3,})')
+    for evd_id in sorted(set(evd_pattern.findall(rfc))):
+        # Count sections where this EVD appears with surrounding context
+        # (not just bare ID reference but with summary/locator text nearby)
+        sections_with_full_evd = 0
+        for sec_name, sec_text in sections.items():
+            if evd_id in sec_text:
+                # Check if it has accompanying text (summary, locator, source_type etc)
+                evd_lines = [l for l in sec_text.split('\n') if evd_id in l]
+                for line in evd_lines:
+                    # Full context = EVD + at least one descriptive field nearby
+                    if len(line) > len(evd_id) + 20:  # More than just an ID reference
+                        sections_with_full_evd += 1
+                        break
+        if sections_with_full_evd >= 3:
+            r.warn(f"{evd_id} appears with full context in {sections_with_full_evd} sections — "
+                   f"consider consolidating to evidence.json + ID-only references")
+
+    # Part 2: HR rule text verbatim duplication across sections
+    hr_pattern = re.compile(r'(?:^[-*>#\d.]+\s*)?([A-Z]+-HR-\d{3,}|HR-\d{3,})[:：]\s*(.+)', re.MULTILINE)
+    for m in hr_pattern.finditer(rfc):
+        hr_id = m.group(1)
+        rule_text = m.group(2).strip()
+        # Only check substantial text (20+ chars)
+        if len(rule_text) < 20:
+            continue
+        # Find which section this HR is defined in
+        source_section = None
+        for sec_name, sec_text in sections.items():
+            if m.group(0) in sec_text:
+                source_section = sec_name
+                break
+        # Check if the same rule text appears verbatim in other sections
+        for sec_name, sec_text in sections.items():
+            if sec_name == source_section:
+                continue
+            if rule_text in sec_text:
+                r.warn(f"{hr_id} rule text appears verbatim in §{source_section} and §{sec_name} — "
+                       f"consider converting one to a back-reference ('see {hr_id}')")
+                break  # Only warn once per HR
+
+    return r
+
+
+# Patterns for implementation detail detection in §5
+IMPL_METHOD_PATTERN = re.compile(
+    r'\b[A-Z][a-zA-Z0-9_]+(?:\.|::)[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\([^)]*\))?'
+)
+IMPL_TYPE_KEYWORDS = re.compile(
+    r'\b(?:vector|map|unordered_map|mutex|lock|atomic|sptr|shared_ptr|unique_ptr|'
+    r'std::|boost::|RWLock|rwlock|Mutex|Lock|Atomic)\b',
+    re.IGNORECASE
+)
+
+
+def check_22_impl_detail_in_design(rfc: str) -> CheckResult:
+    """Check 22 (SOFT): §5 should not contain implementation-level details."""
+    r = CheckResult("22. §5 implementation detail", kind="soft")
+
+    section_5 = _extract_section(rfc, r'(?:5|方案)')
+    if not section_5:
+        return r
+
+    lines = section_5.split('\n')
+    in_code_block = False
+
+    for i, line in enumerate(lines, 1):
+        stripped = line.strip()
+
+        # Skip code blocks (mermaid, text, etc.) — they may contain example patterns
+        if stripped.startswith('```'):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block:
+            continue
+
+        # Skip blockquotes that contain guidance/rules (lines starting with >)
+        if stripped.startswith('>'):
+            continue
+
+        # Skip lines that are clearly negative examples (❌)
+        if '❌' in stripped:
+            continue
+
+        # Check for method signature patterns
+        for m in IMPL_METHOD_PATTERN.finditer(stripped):
+            r.warn(f"§5 line {i}: possible implementation class/method reference '{m.group()}' — "
+                   f"use functional role names instead")
+
+        # Check for language-specific type keywords
+        for m in IMPL_TYPE_KEYWORDS.finditer(stripped):
+            r.warn(f"§5 line {i}: possible implementation-level keyword '{m.group()}' — "
+                   f"§5 should describe behavioral contracts, not implementation types")
+
+    return r
+
+
 # === Helper: extract a section by heading pattern ===
 
 def _extract_section(rfc: str, heading_pattern: str) -> Optional[str]:
@@ -1271,6 +1380,28 @@ def _extract_section(rfc: str, heading_pattern: str) -> Optional[str]:
             section_lines.append(stripped)
 
     return '\n'.join(section_lines) if section_lines else None
+
+
+def _split_into_sections(rfc: str) -> Dict[str, str]:
+    """Split rfc into top-level sections by ## headings."""
+    sections: Dict[str, str] = {}
+    current_name = "_preamble"
+    current_lines: List[str] = []
+
+    for line in rfc.split('\n'):
+        m = re.match(r'^##\s+(\d+\.?\s*.+)', line)
+        if m:
+            if current_lines:
+                sections[current_name] = '\n'.join(current_lines)
+            current_name = m.group(1).strip()
+            current_lines = [line]
+        else:
+            current_lines.append(line)
+
+    if current_lines:
+        sections[current_name] = '\n'.join(current_lines)
+
+    return sections
 
 
 # === Output aggregation ===
@@ -1382,11 +1513,13 @@ def main():
         if hard_checks_cfg.get(check_name, {}).get("enabled", True):
             hard_results.append(check_fn())
 
-    # Checks 18-20: configurable soft checks (respect enabled flag)
+    # Checks 18-22: configurable soft checks (respect enabled flag)
     configurable_soft = [
         ("check_18_diagram_text_pairing", lambda: check_18_diagram_text_pairing(rfc)),
         ("check_19_unresolved_format", lambda: check_19_unresolved_format(rfc)),
         ("check_20_orphan_scn", lambda: check_20_orphan_scn(rfc)),
+        ("check_21_cross_section_redundancy", lambda: check_21_cross_section_redundancy(rfc, evidence)),
+        ("check_22_impl_detail_in_design", lambda: check_22_impl_detail_in_design(rfc)),
     ]
     soft_results = []
     for check_name, check_fn in configurable_soft:

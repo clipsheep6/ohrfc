@@ -100,6 +100,14 @@
     "check_17_orphan_scn": {
       "enabled": true,
       "description": "SCN-### not referenced by any HR or must-pass set"
+    },
+    "check_21_cross_section_redundancy": {
+      "enabled": true,
+      "description": "Warn when same EVD/HR content is duplicated verbatim across 3+ sections"
+    },
+    "check_22_impl_detail_in_design": {
+      "enabled": true,
+      "description": "Warn when §5 contains implementation class names, method signatures, or sync primitives"
     }
   },
   "required_sections": [
