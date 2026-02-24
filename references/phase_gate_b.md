@@ -80,7 +80,7 @@ Write summary.json. Update state.json: `gate_b_result: "pass"`, `current_phase: 
 
 ### FAIL — Early Circuit Breaker
 
-- **Round 1 FAIL** → Automatic fix. Write checkpoint (see below). Update state.json: `gate_b_result: "fail"`, `gate_b_round += 1`, `current_phase: "design"`. If evidence gap: allow one DISCOVER detour per round. Loop to DESIGN.
+- **Round 1 FAIL** → Automatic fix. Write checkpoint (see below). Dispatch `Task(general-purpose)` DESIGN sub-agent with Gate-B findings to fix rfc.md. Update state.json: `gate_b_result: "fail"`, `gate_b_round += 1`, `current_phase: "design"`. If evidence gap: allow one DISCOVER detour per round. Loop to DESIGN.
 
 - **Round 2 FAIL** → Present AskUserQuestion with 3 options:
   - (a) Auto-fix Round 3 (if max rounds allow — Full only)
@@ -98,6 +98,32 @@ Write summary.json. Update state.json: `gate_b_result: "pass"`, `current_phase: 
   2. Risk acceptance — DEC with residual risk + mitigation + tracking
   3. Escalate review + retry
   Write choice as DEC-###.
+
+## Gate-B FAIL Fix Sub-Agent Protocol
+
+When Gate-B FAIL triggers a return to DESIGN, the orchestrator dispatches a `Task(general-purpose)` sub-agent to apply fixes. The sub-agent receives:
+1. Gate-B summary.json (P0/P1/P2 findings with required_actions)
+2. Current rfc.md + evidence.json
+3. Checkpoint context (if context restart)
+
+**Critical requirement**: The sub-agent **MUST return the complete fixed rfc.md content** — not analysis, not recommendations, not a list of suggested changes. The orchestrator will write the returned content directly to rfc.md.
+
+Sub-agent prompt template:
+```
+You are a DESIGN fix agent. Gate-B semantic review has identified the following issues:
+{summary_json_required_actions}
+
+Fix these issues in rfc.md. For each required_action:
+- Apply the specific edit at the indicated location
+- Ensure the fix doesn't break other sections (cross-reference check)
+- Run gate_a_check.py --dry-run to verify structural integrity after fixes
+
+CRITICAL: Return the COMPLETE fixed rfc.md content. Do NOT return analysis or recommendations.
+The orchestrator will write your output directly to rfc.md.
+
+Your output will be strictly cross-reviewed by Codex and other models in the next Gate-B round.
+Ensure every fix is precise and complete to avoid another rejection cycle.
+```
 
 ### FAIL Checkpoint & Restart
 

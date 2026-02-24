@@ -14,8 +14,23 @@ The DESIGN sub-agent must load:
 
 The orchestrator dispatches the sub-agent and validates the returned draft against self-check criteria.
 
+## Quality Bar
+
+> **Your output will be strictly cross-reviewed by multiple independent AI models.**
+>
+> The rfc.md draft you produce will go through:
+> 1. **Gate-A**: 20 automated mechanical checks (17 HARD blockers + 3 SOFT warnings) — structural compliance, ID uniqueness, expression format, SCN coverage, evidence cross-references, impact table dimensions, diagram type coverage, compatibility dimensions
+> 2. **Gate-B**: Multi-route semantic review by independent AI reviewers — including but not limited to **Codex** (known for strict, rigorous structural and logical analysis), plus Architect, Security, and QA perspective reviewers
+>
+> **Every failure triggers a rework cycle that wastes orchestrator context budget and delays delivery.** A single Gate-A HARD failure sends the entire draft back for revision. A Gate-B P0 finding blocks progression entirely.
+>
+> **Get it right the first time.** Treat every SCN expression format, every ID cross-reference, every evidence citation, and every section completeness requirement as non-negotiable. When in doubt, refer to `methodology.md` for the exact rules rather than guessing.
+
+**If entering from Gate-A FAIL (fix cycle)**:
+Orchestrator dispatches `Task(general-purpose)` sub-agent with Gate-A failure list + current rfc.md. Sub-agent fixes ONLY failing items, runs `gate_a_check.py --dry-run` to verify, and **returns the complete fixed rfc.md content** — not analysis or recommendations. Orchestrator writes the returned content.
+
 **If entering from Gate-B FAIL (context restart)**:
-Orchestrator executes Bootstrap Protocol from `references/checkpoint_protocol.md` §4. Provides checkpoint.md content in sub-agent prompt as reasoning context from previous phases.
+Orchestrator executes Bootstrap Protocol from `references/checkpoint_protocol.md` §4. Provides checkpoint.md content in sub-agent prompt as reasoning context from previous phases. Sub-agent **must return the complete fixed rfc.md content** — not analysis or recommendations. The single-writer principle means the orchestrator writes rfc.md, but the sub-agent must produce the full document ready to write.
 
 ## Execution Model
 
@@ -179,9 +194,9 @@ Run template §16.2 self-check (11 items), then these 6 additional checks:
 All passed → Update state.json: `current_phase → "gate_a"`
 Any failed → Fix and re-check (do NOT enter GATE)
 
-## Pre-Gate Dry-Run (recommended)
+## Pre-Gate Dry-Run (mandatory)
 
-After self-check passes, run Gate-A in advisory mode to catch mechanical issues before formal gate entry:
+After self-check passes, run Gate-A in advisory mode. This step is **mandatory** — the sub-agent must not return the draft to the orchestrator until dry-run passes:
 
 ```bash
 python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json --dry-run
@@ -189,9 +204,10 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 
 - If WOULD_PASS: proceed to Checkpoint Write → state transition
 - If WOULD_FAIL: fix failing items (same as self-check fix loop), re-run dry-run
+- **Loop until WOULD_PASS** — do NOT return a draft that would fail Gate-A
 - Dry-run failures do NOT trigger state transition to gate_a; they are advisory only
 
-This step reduces DESIGN→GATE-A round-trips by catching structural/mechanical issues before the formal gate.
+This step eliminates DESIGN→GATE-A round-trips by catching all structural/mechanical issues before the formal gate.
 
 ## Checkpoint Write (after self-check passed)
 

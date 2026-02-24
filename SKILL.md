@@ -9,8 +9,8 @@ description: >
 ---
 
 <!-- skill-meta
-version: 2.9.0
-date: 2026-02-14
+version: 2.10.0
+date: 2026-02-23
 source_rev: git
 -->
 
@@ -162,6 +162,8 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Execution**: Dispatch single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft. Orchestrator receives draft, validates self-check, writes rfc.md + state transition. Fallback: `Task(general-purpose)` if Plan unavailable.
 
+**Quality bar**: The DESIGN sub-agent's output will be strictly cross-reviewed by multiple independent AI models — including Codex (known for rigorous structural analysis), Gate-A automated script (20 mechanical checks), and Gate-B multi-route reviewers. Every rework cycle wastes context budget. The sub-agent prompt MUST include this pressure statement to set the right quality bar from the start.
+
 **Summary** (3 steps + optional parallel gap-filling):
 1. **Fill review layer** (§1-§6): background, pain points, goals, TL;DR, solution overview, impact/compatibility
 2. **Fill normative layer** (§7-§11): decisions, security model, reliability, observability, acceptance (5-category SCN)
@@ -182,7 +184,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Self-check** (must pass before GATE): Run template §16.2 (11 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
 
-**Pre-Gate Dry-Run**: Optional `gate_a_check.py --dry-run` before formal gate entry to reduce DESIGN→GATE-A round-trips.
+**Pre-Gate Dry-Run**: Mandatory `gate_a_check.py --dry-run` before formal gate entry. Sub-agent must run dry-run, fix any failures, and re-run until WOULD_PASS before returning the draft to orchestrator.
 
 **Exit**: Self-check passed. State: current_phase=gate_a. **Checkpoint written** (DESIGN Exit section).
 
@@ -192,7 +194,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Execution**: Run `scripts/gate_a_check.py` directly (no sub-agent needed). Fallback: `references/phase_gate_a.md`.
 
-**Summary**: Run 17 deterministic checks on rfc.md structure and auditability. 3-state output per check: PASS / WARN / FAIL.
+**Summary**: Run 20 deterministic checks on rfc.md structure and auditability. 3-state output per check: PASS / WARN / FAIL.
 
 **Preferred**: Execute `scripts/gate_a_check.py`:
 ```bash
@@ -210,13 +212,18 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 | 12 | HARD | Must-pass SCN validity |
 | 13 | HARD | Coverage matrix completeness |
 | 14 | HARD | Section non-empty |
-| 15 | SOFT | Diagram-text pairing |
-| 16 | SOFT | Unresolved format compliance |
-| 17 | SOFT | Orphan SCN detection |
+| 15 | HARD | Impact table dimensions (API/策略/下游/行为) |
+| 16 | HARD | Diagram type coverage (architecture + sequence) |
+| 17 | HARD | Compatibility dimensions (不变/变化/默认值/回滚) |
+| 18 | SOFT | Diagram-text pairing |
+| 19 | SOFT | Unresolved format compliance |
+| 20 | SOFT | Orphan SCN detection |
 
-14 HARD checks block progression (any FAIL → back to DESIGN). 3 SOFT checks produce WARN only (do not block).
+17 HARD checks block progression (any FAIL → back to DESIGN). 3 SOFT checks produce WARN only (do not block).
 
-**Result**: All HARD PASS → state: gate_a=pass, phase=gate_b. Any HARD FAIL → state: gate_a=fail, phase=design (fix failing items only). SOFT WARN items are logged but do not block.
+**Result**: All HARD PASS → state: gate_a=pass, phase=gate_b. Any HARD FAIL → **dispatch `Task(general-purpose)` sub-agent** with failure list + current rfc.md to fix failing items only → sub-agent returns complete fixed rfc.md → orchestrator writes → re-run Gate-A. State: gate_a=fail, phase=design. SOFT WARN items are logged but do not block.
+
+**Hard rule**: The orchestrator NEVER fixes Gate-A failures in the main window. All fixes are delegated to a DESIGN sub-agent.
 
 **Hard rule**: Gate-B MUST NOT start unless Gate-A = PASS.
 
@@ -280,9 +287,10 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 **Ref** (sub-agent): `references/phase_finalize.md`
 
 **Summary**:
-1. Export derivatives (tasks.md from SCN, acceptance checklist)
-2. Archive process artifacts (events.jsonl, summary.json)
-3. Lock rfc.md normative content. State: phase=finalize.
+1. AskUserQuestion: ask user whether to export derivative artifacts (tasks.md, verification_checklist.md); default is archive-only, skip export if declined
+2. If export requested: dispatch sub-agent for export (tasks.md from SCN, acceptance checklist)
+3. Archive process artifacts (events.jsonl, summary.json)
+4. Lock rfc.md normative content. State: phase=finalize.
 
 **Hard rule**: Post-baseline modification requires: CHG+DEC → Gate-A → Gate-B → re-approval.
 
@@ -323,8 +331,8 @@ User selects change → scope estimate AskUserQuestion
 
 | Current | Event | Target | Action |
 |---------|-------|--------|--------|
-| gate_a | FAIL | design | Located feedback; reset gate_a_result |
-| gate_b | FAIL (round 1) | design | Automatic fix; reset gate_b_result |
+| gate_a | FAIL | design | Dispatch DESIGN sub-agent with failure list; sub-agent returns fixed rfc.md; reset gate_a_result |
+| gate_b | FAIL (round 1) | design | Dispatch DESIGN sub-agent with Gate-B findings; sub-agent returns complete fixed rfc.md; reset gate_b_result |
 | gate_b | FAIL (round 2) | — | Early breaker: 3-choice (auto-fix R3 if Full / scope cut / risk accept) |
 | gate_b | FAIL (evidence gap) | discover | Evidence-only detour (1 per round max) |
 | gate_b | FAIL (max rounds) | — | Convergence 3-choice; write DEC |
@@ -371,7 +379,7 @@ User selects change → scope estimate AskUserQuestion
 | `references/security_template.md` | STRIDE deep-dive template | DESIGN (high-risk) |
 | `references/reviewer_prompts/*.md` | Per-role review perspectives | GATE-B Map |
 | `references/checkpoint_protocol.md` | Checkpoint format, extraction prompts, bootstrap | DISCOVER exit, DESIGN exit, GATE-B FAIL |
-| `scripts/gate_a_check.py` | Automated 17-check Gate-A script (14 HARD + 3 SOFT) | GATE-A |
+| `scripts/gate_a_check.py` | Automated 20-check Gate-A script (17 HARD + 3 SOFT) | GATE-A |
 | `scripts/ohrfc_init.py` | Automated INIT phase (workspace + skeleton + state) | INIT |
 | `assets/schemas/state.schema.json` | State tracking schema | INIT |
 | `assets/schemas/evidence.schema.json` | Evidence record schema | DISCOVER |

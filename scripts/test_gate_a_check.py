@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for gate_a_check.py — covers all 17 checks (14 HARD + 3 SOFT) and 3-state output."""
+"""Unit tests for gate_a_check.py — covers all 20 checks (17 HARD + 3 SOFT) and 3-state output."""
 
 import unittest
 import sys

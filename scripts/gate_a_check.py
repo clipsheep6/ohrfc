@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Gate-A: Structural validation for rfc.md (17 checks: 14 HARD + 3 SOFT).
+Gate-A: Structural validation for rfc.md (20 checks: 17 HARD + 3 SOFT).
 
 HARD checks (block progression):
 1. Structure completeness (required sections)
@@ -17,11 +17,14 @@ HARD checks (block progression):
 12. Must-pass validity (all SCN IDs in must-pass set exist)
 13. Coverage matrix (Standard/Full strictness requires risk→SCN mapping)
 14. Section non-empty (required sections have ≥3 non-whitespace lines)
+15. Impact table columns (§6 impact section has required dimensions)
+16. Diagram type coverage (architecture/boundary + sequence diagrams present)
+17. Compatibility dimensions (§6 compatibility section covers 4 required dimensions)
 
 SOFT checks (WARNING only, do not block):
-15. Diagram-text pairing (mermaid blocks have nearby prose)
-16. Unresolved format (Hard-Unresolved items have owner/action/convergence)
-17. Orphan SCN (SCN not referenced by any HR or must-pass set)
+18. Diagram-text pairing (mermaid blocks have nearby prose)
+19. Unresolved format (Hard-Unresolved items have owner/action/convergence)
+20. Orphan SCN (SCN not referenced by any HR or must-pass set)
 
 Usage:
     python3 gate_a_check.py <rfc.md> [--evidence <evidence.json>] [--template <template.md>] [--dry-run]
@@ -32,7 +35,7 @@ Exit codes:
     1 - FAIL (any hard check failed)
 
 Dry-run mode (--dry-run):
-    Runs all 17 checks in advisory mode. Output is prefixed with [DRY-RUN].
+    Runs all 20 checks in advisory mode. Output is prefixed with [DRY-RUN].
     Final line shows DRY-RUN RESULT: WOULD_PASS or DRY-RUN RESULT: WOULD_FAIL (N HARD failures).
     Exit code is always 0 (advisory, not blocking).
 """
@@ -143,7 +146,7 @@ MERMAID_BLOCK_PATTERN = re.compile(r'```mermaid\n(.*?)```', re.DOTALL)
 MERMAID_BAD_CHARS = re.compile(r'[();]')
 
 # SCN category declaration pattern
-SCN_CATEGORY_PATTERN = re.compile(r'SCN-\d{3,}:\s*(\w+)')
+SCN_CATEGORY_PATTERN = re.compile(r'SCN-\d{3,}[:：]\s*(\w+)')
 
 # Hard assertion keyword patterns (for Check 7 proactive scan)
 # Note: CJK characters don't support \b word boundaries; use lookaround or direct matching
@@ -937,11 +940,186 @@ def check_14_section_non_empty(rfc: str) -> CheckResult:
     return r
 
 
-# === SOFT CHECKS 15-17 ===
+# === NEW HARD CHECKS 15-17 (content pattern) ===
 
-def check_15_diagram_text_pairing(rfc: str) -> CheckResult:
-    """Check 15 (SOFT): Every mermaid block has non-diagram text within 10 lines before or after."""
-    r = CheckResult("15. Diagram-text pairing", kind="soft")
+# Configurable keyword sets for checks 15-17
+IMPACT_TABLE_DIMENSIONS = {
+    "api": re.compile(r'(?:对外\s*)?API|接口|interface', re.IGNORECASE),
+    "policy": re.compile(r'系统设置|策略|设置|policy|setting|config', re.IGNORECASE),
+    "downstream": re.compile(r'下游|组件|依赖|downstream|component|dependent', re.IGNORECASE),
+    "behavior": re.compile(r'行为|口径|behavior|contract|semantic', re.IGNORECASE),
+}
+
+ARCH_DIAGRAM_KEYWORDS = re.compile(
+    r'(?:architecture|架构|边界|boundary|component|组件|模块|module|trust|信任|层|layer)',
+    re.IGNORECASE
+)
+SEQUENCE_DIAGRAM_KEYWORDS = re.compile(
+    r'(?:sequence|顺序|时序|交互|interaction|调用|call)',
+    re.IGNORECASE
+)
+
+COMPAT_DIMENSIONS = {
+    "unchanged": re.compile(r'不变|不改|unchanged|unaffected|保持|保留', re.IGNORECASE),
+    "changed": re.compile(r'变化|变更|changed|modified|新增|移除|删除|added|removed', re.IGNORECASE),
+    "default_value": re.compile(r'默认值|默认|default\s*value|default\s*strategy|缺省', re.IGNORECASE),
+    "rollback": re.compile(r'回滚|回退|rollback|revert|降级|fallback', re.IGNORECASE),
+}
+
+
+def check_15_impact_table(rfc: str) -> CheckResult:
+    """Check 15: Impact/影响 section contains table with required dimensions (API/策略/下游/行为).
+
+    Looks for a table in §6 (影响分析) that covers the 4 impact dimensions either
+    as column headers or as row labels. Alternatively accepts a structured list
+    that covers all 4 dimensions.
+    """
+    r = CheckResult("15. Impact table columns")
+
+    impact_section = _extract_section(rfc, r'(?:影响|impact|兼容)')
+    if impact_section is None:
+        r.fail("No impact/影响 section found — cannot verify impact table dimensions")
+        return r
+
+    # Strategy: scan all table header rows AND list items in the section
+    # for the 4 required dimension keywords
+    found_dims: Dict[str, bool] = {dim: False for dim in IMPACT_TABLE_DIMENSIONS}
+
+    for line in impact_section.split('\n'):
+        stripped = line.strip()
+        for dim_name, dim_re in IMPACT_TABLE_DIMENSIONS.items():
+            if dim_re.search(stripped):
+                found_dims[dim_name] = True
+
+    missing = [d for d, found in found_dims.items() if not found]
+    if missing:
+        label_map = {
+            "api": "对外 API / 接口",
+            "policy": "系统设置或策略",
+            "downstream": "下游组件",
+            "behavior": "行为口径",
+        }
+        missing_labels = [label_map.get(m, m) for m in missing]
+        r.fail(f"Impact section missing dimension(s): {', '.join(missing_labels)}")
+
+    return r
+
+
+def check_16_diagram_types(rfc: str) -> CheckResult:
+    """Check 16: rfc.md contains both architecture/boundary AND sequence/interaction diagrams.
+
+    Scans mermaid blocks for keywords indicating diagram type. Also checks
+    heading text near mermaid blocks for diagram type indicators.
+    """
+    r = CheckResult("16. Diagram type coverage")
+
+    lines = rfc.split('\n')
+    has_arch_diagram = False
+    has_sequence_diagram = False
+    in_mermaid = False
+    mermaid_start = -1
+
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+
+        if stripped == '```mermaid':
+            in_mermaid = True
+            mermaid_start = i
+            continue
+
+        if in_mermaid:
+            if stripped == '```':
+                in_mermaid = False
+                continue
+            # Check mermaid content for diagram type keywords
+            if ARCH_DIAGRAM_KEYWORDS.search(stripped):
+                has_arch_diagram = True
+            if SEQUENCE_DIAGRAM_KEYWORDS.search(stripped):
+                has_sequence_diagram = True
+            continue
+
+        # Also check headings and prose near mermaid blocks for diagram type
+        # (heading within 5 lines before a mermaid block often names the diagram)
+        if stripped.startswith('#') or (stripped.startswith('**') and stripped.endswith('**')):
+            if ARCH_DIAGRAM_KEYWORDS.search(stripped):
+                # Check if a mermaid block follows within 10 lines
+                for j in range(i + 1, min(len(lines), i + 11)):
+                    if lines[j].strip() == '```mermaid':
+                        has_arch_diagram = True
+                        break
+            if SEQUENCE_DIAGRAM_KEYWORDS.search(stripped):
+                for j in range(i + 1, min(len(lines), i + 11)):
+                    if lines[j].strip() == '```mermaid':
+                        has_sequence_diagram = True
+                        break
+
+    # Also detect mermaid diagram types from declaration keywords
+    # graph/flowchart/C4Context → architecture; sequenceDiagram → sequence
+    mermaid_type_pattern = re.compile(
+        r'```mermaid\s*\n\s*(graph|flowchart|C4Context|classDiagram|stateDiagram|sequenceDiagram)',
+        re.MULTILINE
+    )
+    for m in mermaid_type_pattern.finditer(rfc):
+        diagram_type = m.group(1)
+        if diagram_type in ('graph', 'flowchart', 'C4Context', 'classDiagram', 'stateDiagram'):
+            has_arch_diagram = True
+        elif diagram_type == 'sequenceDiagram':
+            has_sequence_diagram = True
+
+    if not has_arch_diagram:
+        r.fail("Missing architecture/boundary diagram (graph/flowchart/C4Context with "
+               "architecture/boundary/component keywords)")
+    if not has_sequence_diagram:
+        r.fail("Missing sequence/interaction diagram (sequenceDiagram or flow with "
+               "sequence/interaction/call keywords)")
+
+    return r
+
+
+def check_17_compat_dimensions(rfc: str) -> CheckResult:
+    """Check 17: Compatibility section covers 4 required dimensions (不变/变化/默认值策略/回滚).
+
+    Scans §6 (影响分析与兼容性) or any section with 兼容 in the heading
+    for the 4 compatibility dimensions.
+    """
+    r = CheckResult("17. Compatibility dimensions")
+
+    # Try multiple heading patterns to find the compatibility section
+    compat_section = _extract_section(rfc, r'(?:兼容|compat)')
+    if compat_section is None:
+        # Also try the broader impact section
+        compat_section = _extract_section(rfc, r'(?:影响|impact)')
+    if compat_section is None:
+        r.fail("No compatibility/兼容性 or impact/影响 section found")
+        return r
+
+    found_dims: Dict[str, bool] = {dim: False for dim in COMPAT_DIMENSIONS}
+
+    for line in compat_section.split('\n'):
+        stripped = line.strip()
+        for dim_name, dim_re in COMPAT_DIMENSIONS.items():
+            if dim_re.search(stripped):
+                found_dims[dim_name] = True
+
+    missing = [d for d, found in found_dims.items() if not found]
+    if missing:
+        label_map = {
+            "unchanged": "不变项",
+            "changed": "变化项",
+            "default_value": "默认值策略",
+            "rollback": "回滚口径",
+        }
+        missing_labels = [label_map.get(m, m) for m in missing]
+        r.fail(f"Compatibility section missing dimension(s): {', '.join(missing_labels)}")
+
+    return r
+
+
+# === SOFT CHECKS 18-20 ===
+
+def check_18_diagram_text_pairing(rfc: str) -> CheckResult:
+    """Check 18 (SOFT): Every mermaid block has non-diagram text within 10 lines before or after."""
+    r = CheckResult("18. Diagram-text pairing", kind="soft")
 
     lines = rfc.split('\n')
     in_mermaid = False
@@ -978,9 +1156,9 @@ def check_15_diagram_text_pairing(rfc: str) -> CheckResult:
     return r
 
 
-def check_16_unresolved_format(rfc: str) -> CheckResult:
-    """Check 16 (SOFT): Hard-Unresolved items contain owner/action/convergence keywords."""
-    r = CheckResult("16. Unresolved format", kind="soft")
+def check_19_unresolved_format(rfc: str) -> CheckResult:
+    """Check 19 (SOFT): Hard-Unresolved items contain owner/action/convergence keywords."""
+    r = CheckResult("19. Unresolved format", kind="soft")
 
     # Find Unresolved sections/items
     unresolved_pattern = re.compile(
@@ -1015,9 +1193,9 @@ def check_16_unresolved_format(rfc: str) -> CheckResult:
     return r
 
 
-def check_17_orphan_scn(rfc: str) -> CheckResult:
-    """Check 17 (SOFT): SCN-### not referenced by any HR or §11 must-pass set."""
-    r = CheckResult("17. Orphan SCN", kind="soft")
+def check_20_orphan_scn(rfc: str) -> CheckResult:
+    """Check 20 (SOFT): SCN-### not referenced by any HR or §11 must-pass set."""
+    r = CheckResult("20. Orphan SCN", kind="soft")
 
     defined, _ = extract_defined_ids(rfc)
     defined_scns = {did for did in defined if did.startswith('SCN-')}
@@ -1159,6 +1337,20 @@ def main():
     template = read_file(args.template) if args.template and Path(args.template).exists() else None
     cfg = load_config(args.config)
 
+    # Rebuild module-level constants so --config overrides take effect at runtime
+    global MIN_SCN_CATEGORIES, REJECT_CATEGORIES, ALLOWED_LANG_TAGS
+    global META_FIELDS, REVIEW_KEYWORDS, NORMATIVE_KEYWORDS
+    global HEADING_CATEGORY_MAP, PLACEHOLDER_PATTERNS, PLACEHOLDER_PATTERN
+    MIN_SCN_CATEGORIES = set(cfg["min_scn_categories"])
+    REJECT_CATEGORIES = set(cfg["reject_categories"])
+    ALLOWED_LANG_TAGS = set(cfg["allowed_lang_tags"])
+    META_FIELDS = list(cfg["meta_fields"])
+    REVIEW_KEYWORDS = list(cfg["review_keywords"])
+    NORMATIVE_KEYWORDS = list(cfg["normative_keywords"])
+    HEADING_CATEGORY_MAP = dict(cfg["heading_category_map"])
+    PLACEHOLDER_PATTERNS = list(cfg["placeholder_patterns"])
+    PLACEHOLDER_PATTERN = re.compile("|".join(PLACEHOLDER_PATTERNS))
+
     hard_checks_cfg = cfg.get("hard_checks", {})
     soft_checks_cfg = cfg.get("soft_checks", {})
 
@@ -1175,23 +1367,26 @@ def main():
         check_9_triggers(rfc),
     ]
 
-    # Checks 10-14: configurable hard checks (respect enabled flag)
+    # Checks 10-17: configurable hard checks (respect enabled flag)
     configurable_hard = [
         ("check_10_hr_scn_binding", lambda: check_10_hr_scn_binding(rfc)),
         ("check_11_dec_alternatives", lambda: check_11_dec_alternatives(rfc)),
         ("check_12_must_pass_validity", lambda: check_12_must_pass_validity(rfc)),
         ("check_13_coverage_matrix", lambda: check_13_coverage_matrix(rfc)),
         ("check_14_section_non_empty", lambda: check_14_section_non_empty(rfc)),
+        ("check_15_impact_table", lambda: check_15_impact_table(rfc)),
+        ("check_16_diagram_types", lambda: check_16_diagram_types(rfc)),
+        ("check_17_compat_dimensions", lambda: check_17_compat_dimensions(rfc)),
     ]
     for check_name, check_fn in configurable_hard:
         if hard_checks_cfg.get(check_name, {}).get("enabled", True):
             hard_results.append(check_fn())
 
-    # Checks 15-17: configurable soft checks (respect enabled flag)
+    # Checks 18-20: configurable soft checks (respect enabled flag)
     configurable_soft = [
-        ("check_15_diagram_text_pairing", lambda: check_15_diagram_text_pairing(rfc)),
-        ("check_16_unresolved_format", lambda: check_16_unresolved_format(rfc)),
-        ("check_17_orphan_scn", lambda: check_17_orphan_scn(rfc)),
+        ("check_18_diagram_text_pairing", lambda: check_18_diagram_text_pairing(rfc)),
+        ("check_19_unresolved_format", lambda: check_19_unresolved_format(rfc)),
+        ("check_20_orphan_scn", lambda: check_20_orphan_scn(rfc)),
     ]
     soft_results = []
     for check_name, check_fn in configurable_soft:

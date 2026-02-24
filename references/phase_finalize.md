@@ -14,17 +14,19 @@ No additional references required.
 
 ## Execution
 
-1. **Export derivatives** (as needed):
-   - Extract SCN chapter → `tasks.md` (acceptance test task list)
-   - Generate acceptance checklist from must-pass set → `verification_checklist.md`
-   - Other project-specific exports per user request
+1. **AskUserQuestion: Export derivatives?**
+   Ask user whether to export derivative artifacts:
+   - Options: "导出任务清单和验收清单 (tasks.md + verification_checklist.md)" / "仅归档，不导出"
+   - Default behavior: **archive-only** (no export unless user explicitly opts in)
 
-2. **Archive process artifacts**:
+2. **If export requested**: Dispatch sub-agent for derivative export (see Task Export below)
+
+3. **Archive process artifacts**:
    - Ensure `.debug/events.jsonl` preserved (truncation/timeout audit trail)
    - Ensure `.reviews/summary.json` preserved (Gate-B final result)
    - Ensure `evidence.json` preserved (evidence chain)
 
-3. **Lock normative content**:
+4. **Lock normative content**:
    - Do NOT modify rfc.md normative content
    - Update state.json: `current_phase: "finalize"`
 

@@ -120,7 +120,7 @@ Light/Full 需用户明确指定，默认 Standard。
 
 ```
 INIT → DISCOVER & CLARIFY → DESIGN → GATE-A → GATE-B → REVIEW → FINALIZE
-       扫描+提问+证据       约束→方案  机械检查  语义评审  人工审批  锁定+导出
+       扫描+提问+证据       约束→方案  机械检查  语义评审  人工审批  锁定+可选导出
 ```
 
 Gate 失败有界回环；Light 模式跳过 Gate-B。细节见 `SKILL.md`。
