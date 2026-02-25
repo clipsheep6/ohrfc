@@ -3,7 +3,7 @@
 > Deterministic structural/auditability check. Does NOT evaluate design quality.
 > **Input**: rfc.md + evidence.json
 > **Output**: PASS/FAIL + actionable failure list (section/ID located)
-> **Checks**: 20 total (17 HARD + 3 SOFT)
+> **Checks**: 22 total (17 HARD + 5 SOFT)
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Fall through to normal execution only if: (a) no sub-agent Gate-A result availab
 
 ## Gate-A FAIL Fix Delegation
 
-When Gate-A reports FAIL, the orchestrator dispatches a `Task(general-purpose)` sub-agent to fix the failing items. The orchestrator provides:
+When Gate-A reports FAIL, the orchestrator dispatches a `Task(general-purpose)` sub-agent to fix the failing items (see §1.2 agent type compatibility rule for CLI fallback). The orchestrator provides:
 1. The Gate-A failure output (section/ID locations + fix suggestions)
 2. Current rfc.md content
 3. evidence.json content (if evidence-related failures)

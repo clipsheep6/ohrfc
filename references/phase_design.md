@@ -19,7 +19,7 @@ The orchestrator dispatches the sub-agent and validates the returned draft again
 > **Your output will be strictly cross-reviewed by multiple independent AI models, including Codex.**
 >
 > The rfc.md draft you produce will go through:
-> 1. **Gate-A**: 20 automated mechanical checks (17 HARD blockers + 3 SOFT warnings) — structural compliance, ID uniqueness, expression format, SCN coverage, evidence cross-references, impact table dimensions, diagram type coverage, compatibility dimensions
+> 1. **Gate-A**: 22 automated mechanical checks (17 HARD blockers + 5 SOFT warnings) — structural compliance, ID uniqueness, expression format, SCN coverage, evidence cross-references, impact table dimensions, diagram type coverage, compatibility dimensions, cross-section redundancy, implementation detail detection
 > 2. **Gate-B**: Multi-route semantic review by independent AI reviewers — including but not limited to **Codex** (known for strict, rigorous structural and logical analysis), plus Architect, Security, and QA perspective reviewers
 >
 > **Every failure triggers a rework cycle that wastes orchestrator context budget and delays delivery.** A single Gate-A HARD failure sends the entire draft back for revision. A Gate-B P0 finding blocks progression entirely.
@@ -71,19 +71,22 @@ At each section, the sub-agent MUST pause and answer internally:
 
 When Socratic Pause reveals a fork (§5 or §7: "Why this over the 2nd best?" has no clear answer):
 
-**Confidence assessment**:
-- **High confidence (>80%)**: Select recommended approach. Record in DEC-### with alternatives + rationale.
-- **Low confidence (≤80%)**: Trigger escalation signal → return to orchestrator for user decision.
+**Escalation criteria** — escalate to user when ANY of:
+1. **No dominant option**: No single option dominates on ≥2 of 3 axes (performance / complexity / maintainability)
+2. **High blast radius**: Affects ≥3 downstream IDs AND spans ≥2 rfc.md sections
+3. **Missing information**: Requires information unavailable to sub-agent (user preference / business priority / external constraint)
+
+If none of the 3 criteria are met → sub-agent selects the recommended approach autonomously and records in DEC-### with alternatives + rationale.
 
 **Escalation signal format** (returned to orchestrator):
 ```text
 FORK_ESCALATION:
   section: §5 / §7
   description: <what the fork is about>
+  criteria_met: [1|2|3]  # which escalation criteria triggered
   option_a: { summary, trade_offs, affected_ids[] }
   option_b: { summary, trade_offs, affected_ids[] }
   recommendation: A / B / none
-  confidence: 0-100
 ```
 
 **Orchestrator handling**:
@@ -93,7 +96,7 @@ FORK_ESCALATION:
 
 **Conservative trigger constraints** (prevent over-escalation):
 - Max 2 escalations per DESIGN phase
-- Only **architectural-level** forks qualify (affects ≥3 IDs OR spans ≥2 rfc.md sections)
+- Only **architectural-level** forks qualify (criteria 2 serves as minimum impact filter)
 - Implementation-level choices (library selection within same architecture) → sub-agent decides autonomously via DEC-###
 
 Only proceed to write after all Pause questions are answered satisfactorily (including any fork escalation resolution).

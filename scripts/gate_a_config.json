@@ -86,18 +86,30 @@
     "check_14_section_non_empty": {
       "enabled": true,
       "description": "Required template sections must have ≥3 non-whitespace content lines"
+    },
+    "check_15_impact_table": {
+      "enabled": true,
+      "description": "Impact section must contain 4 required dimensions (API/策略/下游/行为)"
+    },
+    "check_16_diagram_types": {
+      "enabled": true,
+      "description": "rfc.md must contain both architecture/boundary AND sequence/interaction diagrams"
+    },
+    "check_17_compat_dimensions": {
+      "enabled": true,
+      "description": "Compatibility section must cover 4 dimensions (不变/变化/默认值策略/回滚)"
     }
   },
   "soft_checks": {
-    "check_15_diagram_text_pairing": {
+    "check_18_diagram_text_pairing": {
       "enabled": true,
       "description": "Every mermaid block should have prose text within 10 lines"
     },
-    "check_16_unresolved_format": {
+    "check_19_unresolved_format": {
       "enabled": true,
       "description": "Hard-Unresolved items should contain owner/action/convergence keywords"
     },
-    "check_17_orphan_scn": {
+    "check_20_orphan_scn": {
       "enabled": true,
       "description": "SCN-### not referenced by any HR or must-pass set"
     },

@@ -124,7 +124,7 @@ INIT → DISCOVER&CLARIFY → DESIGN → GATE-A → [FAIL→DESIGN]
 **Phase exit minimum contracts**:
 - DISCOVER exit: ≥1 scope/non-goal REQ/DEC, ≥3 HR drafts, ≥3 SCN drafts, unknowns graded Hard/Soft
 - DESIGN exit: structure complete, IDs no placeholders, minimal SCN categories met, self-check passed, gate_a_check.py --dry-run WOULD_PASS
-- GATE-A exit: all 17 HARD checks must PASS; 3 SOFT checks produce warnings only (20-check total)
+- GATE-A exit: all 17 HARD checks must PASS; 5 SOFT checks produce warnings only (22-check total)
 - GATE-B exit: PASS predicate (6 conditions) satisfied
 
 ## 3. Strictness Levels

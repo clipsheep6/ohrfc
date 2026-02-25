@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ohrfc:events.schema.json",
+  "title": "OHRFC events.jsonl schema (one object per line)",
+  "description": "Each line in events.jsonl is a JSON object conforming to this schema. Records workflow events for post-hoc analysis.",
+  "type": "object",
+  "required": ["event_type", "ts", "phase"],
+  "additionalProperties": false,
+  "properties": {
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "phase_start",
+        "phase_end",
+        "truncation",
+        "timeout",
+        "limit_hit",
+        "gate_fail",
+        "gate_pass",
+        "error"
+      ],
+      "description": "Type of workflow event"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the event"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "init",
+        "discover",
+        "design",
+        "gate_a",
+        "gate_b",
+        "review",
+        "finalize",
+        "baseline_change"
+      ],
+      "description": "Workflow phase in which the event occurred"
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["info", "warn", "error"],
+      "description": "Event severity level"
+    },
+    "details": {
+      "type": "object",
+      "description": "Event-specific payload (tool name, bounds, reason, impact, etc.)",
+      "additionalProperties": true
+    },
+    "mapped_to": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "description": "IDs affected by this event (UNR-###, DEC-###, EVD-###, etc.)"
+    }
+  }
+}

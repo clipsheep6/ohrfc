@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for gate_a_check.py — covers all 20 checks (17 HARD + 3 SOFT) and 3-state output."""
+"""Unit tests for gate_a_check.py — covers all 22 checks (17 HARD + 5 SOFT) and 3-state output."""
 
 import unittest
 import sys
@@ -21,9 +21,12 @@ from gate_a_check import (
     check_12_must_pass_validity,
     check_13_coverage_matrix,
     check_14_section_non_empty,
-    check_15_diagram_text_pairing,
-    check_16_unresolved_format,
-    check_17_orphan_scn,
+    check_15_impact_table,
+    check_16_diagram_types,
+    check_17_compat_dimensions,
+    check_18_diagram_text_pairing,
+    check_19_unresolved_format,
+    check_20_orphan_scn,
     run_gate_a,
     extract_ids,
     extract_defined_ids,
@@ -846,7 +849,7 @@ class TestCheck15DiagramTextPairing(unittest.TestCase):
     def test_pass_mermaid_with_surrounding_text(self):
         """Mermaid block with text nearby should pass."""
         rfc = "这是描述文字\n```mermaid\nflowchart LR\n  A --> B\n```\n后续说明\n"
-        r = check_15_diagram_text_pairing(rfc)
+        r = check_18_diagram_text_pairing(rfc)
         self.assertEqual(len(r.warnings), 0, f"Expected no warnings but got: {r.warnings}")
 
     def test_warn_mermaid_isolated(self):
@@ -854,14 +857,14 @@ class TestCheck15DiagramTextPairing(unittest.TestCase):
         # 12 blank lines before and after to ensure isolation
         blank = "\n" * 12
         rfc = blank + "```mermaid\nflowchart LR\n  A --> B\n```\n" + blank
-        r = check_15_diagram_text_pairing(rfc)
+        r = check_18_diagram_text_pairing(rfc)
         self.assertTrue(len(r.warnings) > 0, "Expected WARN for isolated mermaid block")
 
     def test_soft_check_does_not_fail(self):
         """Soft check should never set passed=False, only warn."""
         blank = "\n" * 12
         rfc = blank + "```mermaid\nflowchart LR\n  A --> B\n```\n" + blank
-        r = check_15_diagram_text_pairing(rfc)
+        r = check_18_diagram_text_pairing(rfc)
         self.assertTrue(r.passed, "Soft check should always have passed=True")
 
 
@@ -871,19 +874,19 @@ class TestCheck16UnresolvedFormat(unittest.TestCase):
     def test_pass_unresolved_with_owner(self):
         """Unresolved item with owner keyword should pass."""
         rfc = "## Hard-Unresolved\n- owner: Alice, action: 确认接口, convergence: 2026-03-01\n"
-        r = check_16_unresolved_format(rfc)
+        r = check_19_unresolved_format(rfc)
         self.assertEqual(len(r.warnings), 0, f"Expected no warnings but got: {r.warnings}")
 
     def test_warn_unresolved_without_keywords(self):
         """Unresolved item without owner/action/convergence should warn."""
         rfc = "## Hard-Unresolved\n- 接口设计待讨论\n"
-        r = check_16_unresolved_format(rfc)
+        r = check_19_unresolved_format(rfc)
         self.assertTrue(len(r.warnings) > 0, "Expected WARN for unresolved without keywords")
 
     def test_pass_no_unresolved_section(self):
         """No unresolved section should produce no warnings."""
         rfc = "# RFC\n## 1. 背景\n内容\n"
-        r = check_16_unresolved_format(rfc)
+        r = check_19_unresolved_format(rfc)
         self.assertEqual(len(r.warnings), 0)
 
 
@@ -892,7 +895,7 @@ class TestCheck16UnresolvedFormat(unittest.TestCase):
 class TestCheck17OrphanSCN(unittest.TestCase):
     def test_pass_all_scns_referenced(self):
         """SCNs referenced by HR or triggers should pass."""
-        r = check_17_orphan_scn(MINIMAL_RFC)
+        r = check_20_orphan_scn(MINIMAL_RFC)
         # MINIMAL_RFC has SCN-001, SCN-020, SCN-030, SCN-040 — some may be orphans
         # SCN-010 is referenced by SEC-HR-001, SCN-030 by REL-HR-001
         # SCN-010 also in trigger Links
@@ -908,13 +911,13 @@ class TestCheck17OrphanSCN(unittest.TestCase):
             "SCN-001: normal\n  WHEN x\n  THEN y\n"
             "SCN-099: orphan\n  WHEN a\n  THEN b\n"
         )
-        r = check_17_orphan_scn(rfc)
+        r = check_20_orphan_scn(rfc)
         self.assertTrue(any("SCN-099" in w for w in r.warnings), f"SCN-099 should be orphan: {r.warnings}")
 
     def test_pass_no_scns(self):
         """No SCN definitions should trivially pass."""
         rfc = "# RFC\n## 1. 背景\n内容\n"
-        r = check_17_orphan_scn(rfc)
+        r = check_20_orphan_scn(rfc)
         self.assertEqual(len(r.warnings), 0)
 
 
@@ -1114,7 +1117,7 @@ class TestConfigToggle(unittest.TestCase):
                 "check_14_section_non_empty": {"enabled": False},
             },
             "soft_checks": {
-                "check_17_orphan_scn": {"enabled": False},
+                "check_20_orphan_scn": {"enabled": False},
             },
         }
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -1124,7 +1127,7 @@ class TestConfigToggle(unittest.TestCase):
             cfg = load_config(tmp_path)
             self.assertFalse(cfg["hard_checks"]["check_10_hr_scn_binding"]["enabled"])
             self.assertFalse(cfg["hard_checks"]["check_14_section_non_empty"]["enabled"])
-            self.assertFalse(cfg["soft_checks"]["check_17_orphan_scn"]["enabled"])
+            self.assertFalse(cfg["soft_checks"]["check_20_orphan_scn"]["enabled"])
         finally:
             os.unlink(tmp_path)
 
@@ -1150,23 +1153,23 @@ class TestConfigToggle(unittest.TestCase):
     def test_toggle_skips_disabled_soft_check(self):
         """When a soft check is disabled in config, it should be skipped."""
         soft_checks_cfg = {
-            "check_15_diagram_text_pairing": {"enabled": True},
-            "check_16_unresolved_format": {"enabled": False},
-            "check_17_orphan_scn": {"enabled": False},
+            "check_18_diagram_text_pairing": {"enabled": True},
+            "check_19_unresolved_format": {"enabled": False},
+            "check_20_orphan_scn": {"enabled": False},
         }
         rfc = MINIMAL_RFC
         configurable_soft = [
-            ("check_15_diagram_text_pairing", lambda: check_15_diagram_text_pairing(rfc)),
-            ("check_16_unresolved_format", lambda: check_16_unresolved_format(rfc)),
-            ("check_17_orphan_scn", lambda: check_17_orphan_scn(rfc)),
+            ("check_18_diagram_text_pairing", lambda: check_18_diagram_text_pairing(rfc)),
+            ("check_19_unresolved_format", lambda: check_19_unresolved_format(rfc)),
+            ("check_20_orphan_scn", lambda: check_20_orphan_scn(rfc)),
         ]
         results = []
         for check_name, check_fn in configurable_soft:
             if soft_checks_cfg.get(check_name, {}).get("enabled", True):
                 results.append(check_fn())
-        # Only check_15 enabled
+        # Only check_18 enabled
         self.assertEqual(len(results), 1)
-        self.assertIn("15", results[0].name)
+        self.assertIn("18", results[0].name)
 
     def test_toggle_defaults_to_enabled(self):
         """When config has no entry for a check, it defaults to enabled."""
@@ -1203,9 +1206,9 @@ class TestDryRunMode(unittest.TestCase):
             check_9_triggers(rfc),
         ]
         soft_results = [
-            check_15_diagram_text_pairing(rfc),
-            check_16_unresolved_format(rfc),
-            check_17_orphan_scn(rfc),
+            check_18_diagram_text_pairing(rfc),
+            check_19_unresolved_format(rfc),
+            check_20_orphan_scn(rfc),
         ]
         report = run_gate_a(hard_results, soft_results)
         return hard_results, soft_results, report

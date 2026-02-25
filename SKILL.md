@@ -9,8 +9,8 @@ description: >
 ---
 
 <!-- skill-meta
-version: 2.10.0
-date: 2026-02-23
+version: 2.11.0
+date: 2026-02-24
 source_rev: git
 -->
 
@@ -87,6 +87,8 @@ Sub-agents (isolated context):
   NEVER: AskUserQuestion | write rfc.md/state.json (evidence.json: delegated to EVIDENCE_TARGETED writer sub-agent only)
 ```
 
+**Agent type compatibility**: This workflow uses `Task(general-purpose)` as the default sub-agent type for tasks requiring file editing, bash execution, or structured output. Not all CLI environments recognize this type name. When dispatching `Task(general-purpose)` and the CLI reports an unknown/invalid agent type error, retry with `Task(general)` or any available agent type that provides Read + Edit + Write + Bash capabilities. This fallback rule applies to ALL `Task(general-purpose)` references throughout this document and phase references — individual call sites do not repeat this instruction.
+
 Per-phase delegation:
 - **INIT**: Script (`ohrfc_init.py`). No sub-agent needed.
 - **DISCOVER**: Staged sub-agents: (1) single `Task(Explore)` for QUICK_SCAN + REASONING_PASS (serial), (2) orchestrator handles CLARIFY, (3) EVIDENCE_TARGETED two-phase: 1-3 parallel `Task(Explore)` agents search code and return EVD candidates → 1 `Task(general-purpose)` agent receives candidates and writes evidence.json directly. Orchestrator updates state.json only.
@@ -131,13 +133,21 @@ python3 scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard
 ```
 
 **Summary**:
-1. Confirm strictness (default Standard; Light/Full must be explicitly requested) via AskUserQuestion if not specified
+1. Confirm strictness (default Standard; Light/Full must be explicitly requested) via AskUserQuestion if not specified:
+   - **Light**: ~3-5 轮交互，跳过语义评审(Gate-B)，适合低风险明确需求
+   - **Standard**: ~8-15 轮交互，含双质量门(Gate-A + Gate-B)，平衡质量与效率
+   - **Full**: ~15-25 轮交互，多模型多角色评审，适合高风险架构决策
 2. Create workspace: `mkdir -p .ohrfc/<rfc_id>/{.debug,.reviews}`
 3. Read `references/rfc_template.md` → Write rfc.md skeleton (headings + meta only)
 4. Write evidence.json (`{ "schema_version": "v1", "items": [] }`)
 5. Write state.json (per `assets/schemas/state.schema.json`): `current_phase: "discover"`
 
 **Exit**: rfc.md with meta triple (template_id/template_version/strictness); evidence.json; state.json with current_phase=discover.
+
+**Event**: Write `phase_end` event to `.ohrfc/<rfc_id>/.debug/events.jsonl` (per `assets/schemas/events.schema.json`):
+```json
+{"event_type":"phase_end","ts":"<ISO8601>","phase":"init","severity":"info","details":{"strictness":"<level>","rfc_id":"<id>"},"mapped_to":[]}
+```
 
 ---
 
@@ -160,6 +170,11 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Exit**: ≥1 scope/non-goal REQ/DEC, ≥3 HR drafts, ≥3 falsifiable SCN drafts, unknowns graded Hard/Soft. State: current_phase=design. **Checkpoint written** (DISCOVER Exit section).
 
+**Event**: Write `phase_end` event to `.debug/events.jsonl`:
+```json
+{"event_type":"phase_end","ts":"<ISO8601>","phase":"discover","severity":"info","details":{"evd_count":<N>,"hr_count":<N>,"scn_count":<N>},"mapped_to":[]}
+```
+
 ---
 
 ## Phase 3: DESIGN
@@ -168,7 +183,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Execution**: Dispatch single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft. Orchestrator receives draft, validates self-check, writes rfc.md + state transition. Fallback: `Task(general-purpose)` if Plan unavailable.
 
-**Quality bar**: The DESIGN sub-agent's output will be strictly cross-reviewed by multiple independent AI models — including Codex (known for rigorous structural analysis), Gate-A automated script (20 mechanical checks), and Gate-B multi-route reviewers. Every rework cycle wastes context budget. The sub-agent prompt MUST include this pressure statement to set the right quality bar from the start.
+**Quality bar**: The DESIGN sub-agent's output will be strictly cross-reviewed by multiple independent AI models — including Codex (known for rigorous structural analysis), Gate-A automated script (22 mechanical checks), and Gate-B multi-route reviewers. Every rework cycle wastes context budget. The sub-agent prompt MUST include this pressure statement to set the right quality bar from the start.
 
 **Summary** (3 steps + optional parallel gap-filling):
 1. **Fill review layer** (§1-§6): background, pain points, goals, TL;DR, solution overview, impact/compatibility
@@ -194,6 +209,11 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Exit**: Self-check passed. State: current_phase=gate_a. **Checkpoint written** (DESIGN Exit section).
 
+**Event**: Write `phase_end` event to `.debug/events.jsonl`:
+```json
+{"event_type":"phase_end","ts":"<ISO8601>","phase":"design","severity":"info","details":{"fork_escalations":<0-2>,"self_check":"pass"},"mapped_to":[]}
+```
+
 ---
 
 ## Phase 4: GATE-A (Mechanical Check)
@@ -202,7 +222,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Fast Path**: If DESIGN sub-agent already ran formal `gate_a_check.py` and returned PASS result, orchestrator skips re-execution, directly updates state.json. Falls through to normal execution only if no sub-agent result is available.
 
-**Summary**: Run 20 deterministic checks on rfc.md structure and auditability. 3-state output per check: PASS / WARN / FAIL.
+**Summary**: Run 22 deterministic checks on rfc.md structure and auditability. 3-state output per check: PASS / WARN / FAIL.
 
 **Preferred**: Execute `scripts/gate_a_check.py`:
 ```bash
@@ -211,25 +231,38 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 
 | Check | Type | What |
 |-------|------|------|
-| 1-2 | HARD | Structure match + ID uniqueness |
-| 3-4 | HARD | No placeholders + expression rules |
-| 5-6 | HARD | Readability + SCN category coverage |
-| 7-9 | HARD | Evidence cross-check + strictness + trigger declarations |
+| 1 | HARD | Structure match (template headings) |
+| 2 | HARD | ID uniqueness (HR/DEC/SCN/REQ/EVD) |
+| 3 | HARD | No placeholders (TBD/XXX/TODO/FIXME) |
+| 4 | HARD | Expression rules (WHEN/AND/THEN format) |
+| 5 | HARD | Readability (review + normative keyword coverage) |
+| 6 | HARD | SCN category coverage (6 categories) |
+| 7 | HARD | Evidence cross-check (EVD citations valid) |
+| 8 | HARD | Strictness requirements (coverage matrix, option sets) |
+| 9 | HARD | Trigger declarations (§14 format) |
 | 10 | HARD | HR-SCN binding integrity |
 | 11 | HARD | DEC alternatives documented |
 | 12 | HARD | Must-pass SCN validity |
 | 13 | HARD | Coverage matrix completeness |
-| 14 | HARD | Section non-empty |
+| 14 | HARD | Section non-empty (≥3 content lines) |
 | 15 | HARD | Impact table dimensions (API/策略/下游/行为) |
 | 16 | HARD | Diagram type coverage (architecture + sequence) |
 | 17 | HARD | Compatibility dimensions (不变/变化/默认值/回滚) |
 | 18 | SOFT | Diagram-text pairing |
 | 19 | SOFT | Unresolved format compliance |
 | 20 | SOFT | Orphan SCN detection |
+| 21 | SOFT | Cross-section redundancy |
+| 22 | SOFT | Implementation detail in §5 |
 
-17 HARD checks block progression (any FAIL → back to DESIGN). 3 SOFT checks produce WARN only (do not block).
+17 HARD checks block progression (any FAIL → back to DESIGN). 5 SOFT checks produce WARN only (do not block).
 
 **Result**: All HARD PASS → state: gate_a=pass, phase=gate_b. Any HARD FAIL → **dispatch `Task(general-purpose)` sub-agent** with failure list + current rfc.md to fix failing items only → sub-agent returns complete fixed rfc.md → orchestrator writes → re-run Gate-A. State: gate_a=fail, phase=design. SOFT WARN items are logged but do not block.
+
+**Event**: Write `gate_pass` or `gate_fail` event to `.debug/events.jsonl`:
+```json
+{"event_type":"gate_pass","ts":"<ISO8601>","phase":"gate_a","severity":"info","details":{"hard_pass_count":17,"soft_warn_count":<N>},"mapped_to":[]}
+{"event_type":"gate_fail","ts":"<ISO8601>","phase":"gate_a","severity":"error","details":{"hard_fail":["<check_names>"],"hard_pass_count":<N>},"mapped_to":[]}
+```
 
 **Hard rule**: The orchestrator NEVER fixes Gate-A failures in the main window. All fixes are delegated to a DESIGN sub-agent.
 
@@ -270,6 +303,12 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 - FAIL (rounds left) → **Checkpoint written** (Gate-B Round N Exit section) → **context restart** → state: gate_b=fail, phase=design. Bootstrap via `references/checkpoint_protocol.md` §4.
 - FAIL (max rounds) → convergence 3-choice via AskUserQuestion
 
+**Event**: Write `gate_pass` or `gate_fail` event to `.debug/events.jsonl`:
+```json
+{"event_type":"gate_pass","ts":"<ISO8601>","phase":"gate_b","severity":"info","details":{"round":<N>,"p0_count":0,"p1_count":<N>},"mapped_to":[]}
+{"event_type":"gate_fail","ts":"<ISO8601>","phase":"gate_b","severity":"error","details":{"round":<N>,"p0_count":<N>,"p1_open":<N>},"mapped_to":[]}
+```
+
 ---
 
 ## Phase 6: REVIEW (Human Approval)
@@ -288,6 +327,11 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 - **Mode C: Progressive Review** — AI-guided risk-prioritized review with thinking models + Socratic challenges; AI recommends, user decides (recommended for Standard strictness)
 - **Mode B: Interactive Review** — full section-by-section walkthrough with isolated sub-agent providing multi-perspective AI analysis; supports chapter selection + early exit (recommended for Full strictness / high-risk RFCs)
 
+**Event**: Write `phase_end` event to `.debug/events.jsonl`:
+```json
+{"event_type":"phase_end","ts":"<ISO8601>","phase":"review","severity":"info","details":{"mode":"<A|B|C>","result":"<approve|reject>"},"mapped_to":[]}
+```
+
 ---
 
 ## Phase 7: FINALIZE
@@ -301,6 +345,11 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 4. Lock rfc.md normative content. State: phase=finalize.
 
 **Hard rule**: Post-baseline modification requires: CHG+DEC → Gate-A → Gate-B → re-approval.
+
+**Event**: Write `phase_end` event to `.debug/events.jsonl`:
+```json
+{"event_type":"phase_end","ts":"<ISO8601>","phase":"finalize","severity":"info","details":{"exported":true,"baseline_accepted":true},"mapped_to":[]}
+```
 
 ---
 
@@ -387,11 +436,12 @@ User selects change → scope estimate AskUserQuestion
 | `references/security_template.md` | STRIDE deep-dive template | DESIGN (high-risk) |
 | `references/reviewer_prompts/*.md` | Per-role review perspectives | GATE-B Map |
 | `references/checkpoint_protocol.md` | Checkpoint format, extraction prompts, bootstrap | DISCOVER exit, DESIGN exit, GATE-B FAIL |
-| `scripts/gate_a_check.py` | Automated 20-check Gate-A script (17 HARD + 3 SOFT) | GATE-A |
+| `scripts/gate_a_check.py` | Automated 22-check Gate-A script (17 HARD + 5 SOFT) | GATE-A |
 | `scripts/ohrfc_init.py` | Automated INIT phase (workspace + skeleton + state) | INIT |
 | `assets/schemas/state.schema.json` | State tracking schema | INIT |
 | `assets/schemas/evidence.schema.json` | Evidence record schema | DISCOVER |
 | `assets/schemas/review_summary.schema.json` | Gate-B summary schema | GATE-B Reduce |
+| `assets/schemas/events.schema.json` | Workflow events schema (events.jsonl) | All phases |
 | `assets/examples/evidence.example.json` | Evidence record example | DISCOVER, DESIGN |
 | `assets/examples/review_summary.example.json` | Gate-B summary example | GATE-B Reduce |
 | `assets/examples/events.example.jsonl` | Debug events example | All phases (on truncation/timeout) |

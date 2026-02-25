@@ -1,2 +1,5 @@
-{"ts":"2026-02-10T00:00:00Z","kind":"scan_truncated","phase":"DISCOVER","tool":"rg","bounds":{"timeout_ms":5000,"file_limit":200},"reason":"timeout","impact":"可能遗漏入口路径","mapped_to":["UNR-001"]}
-{"ts":"2026-02-10T00:00:10Z","kind":"evidence_truncated","phase":"DISCOVER","evd_id":"EVD-005","bounds":{"topk":50},"reason":"topk_limit","impact":"硬断言证据不完整，需降级或补证据","mapped_to":["DEC-003"]}
+{"event_type":"phase_start","ts":"2026-02-10T00:00:00Z","phase":"discover","severity":"info","details":{"strictness":"standard","rfc_id":"example-001"},"mapped_to":[]}
+{"event_type":"truncation","ts":"2026-02-10T00:00:05Z","phase":"discover","severity":"warn","details":{"tool":"rg","bounds":{"timeout_ms":5000,"file_limit":200},"reason":"timeout"},"mapped_to":["UNR-001"]}
+{"event_type":"phase_end","ts":"2026-02-10T00:05:00Z","phase":"discover","severity":"info","details":{"evd_count":8,"hr_count":5,"scn_count":6},"mapped_to":[]}
+{"event_type":"gate_fail","ts":"2026-02-10T00:12:00Z","phase":"gate_a","severity":"error","details":{"hard_fail":["check_4_expression_rules","check_6_scn_coverage"],"hard_pass_count":15,"soft_warn_count":1},"mapped_to":[]}
+{"event_type":"gate_pass","ts":"2026-02-10T00:18:00Z","phase":"gate_a","severity":"info","details":{"hard_pass_count":17,"soft_warn_count":1,"fix_rounds":1},"mapped_to":[]}

@@ -68,7 +68,7 @@ Inputs provided to review sub-agent:
 1. `rfc.md` — the RFC document under review
 2. `evidence.json` — evidence records supporting hard assertions
 3. `.reviews/summary.json` — Gate-B reviewer findings (if Gate-B was run)
-4. Gate-A SOFT warnings (checks 15-17, if any)
+4. Gate-A SOFT warnings (checks 18-22, if any)
 
 Not provided (isolation boundary):
 - DISCOVER/DESIGN phase conversation history
@@ -151,7 +151,7 @@ Inputs provided to review sub-agent:
 1. `rfc.md` — the RFC document under review
 2. `evidence.json` — evidence records supporting hard assertions
 3. `.reviews/summary.json` — Gate-B reviewer findings (if Gate-B was run)
-4. Gate-A SOFT warnings (checks 15-17, if any)
+4. Gate-A SOFT warnings (checks 18-22, if any)
 
 Not provided (isolation boundary):
 - DISCOVER/DESIGN phase conversation history
