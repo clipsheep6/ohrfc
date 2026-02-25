@@ -19,7 +19,9 @@
 | 9 | 可靠性与健壮性 | Normative | REL-HR rules → rationale → SCN → invariants |
 | 10 | 可观测性 | Normative | Minimum observability requirements + SCN binding |
 | 11 | 验收 | Normative | 5-category SCN + must-pass + risk coverage matrix |
+| 12 | 变更记录 | Appendix | Change log entries |
 | 14 | 门禁声明 | Appendix | Trigger YES/NO + Links (Gate-A checks this) |
+| 15 | 发布与影响元信息 | Appendix | Release & impact metadata |
 | 16 | 附录 | Appendix | Roles + 11-item self-check + document meta |
 
 ---

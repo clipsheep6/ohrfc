@@ -9,7 +9,7 @@
 
 None. All check logic is built into `scripts/gate_a_check.py`. No reference files need to be loaded by the orchestrator.
 
-**Fallback** (script unavailable): Load `references/methodology.md §4-6` for manual check execution.
+**Fallback** (script unavailable): Checks 1-9 semantics are defined in `references/methodology.md §4-6`; checks 10-22 semantics are defined in the script source only.
 
 ## Execution: Run Check Sequence
 
@@ -21,7 +21,7 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 
 Exit code 0 = PASS, 1 = FAIL. Stdout contains per-check results.
 
-**Fallback** (if script unavailable): Execute checks manually per the check definitions in the script. All check semantics (IDs, thresholds, format rules) are defined in methodology.md §4-6.
+**Fallback** (if script unavailable): Execute checks manually per the check definitions in the script. Checks 1-9 semantics are defined in methodology.md §4-6; checks 10-22 semantics are defined in the script source only.
 
 ## Fast Path (from DESIGN sub-agent)
 

@@ -201,7 +201,7 @@ Apply these lenses during self-check:
 
 ### Check Items
 
-Run template §16.2 self-check (11 items), then these 6 additional checks:
+Run template §16.2 self-check (13 items), then these 6 additional checks:
 
 - [ ] **Structure**: All sections present, meta triple filled
 - [ ] **Expression**: All SCN use WHEN/AND/THEN on separate lines; no wall-of-text (per methodology.md §5)

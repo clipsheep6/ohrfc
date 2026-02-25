@@ -203,7 +203,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 - Orchestrator writes merged draft to rfc.md (single-writer)
 - Light mode: single sub-agent writes complete draft directly; no parallel gap-filling
 
-**Self-check** (must pass before GATE): Run template §16.2 (11 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
+**Self-check** (must pass before GATE): Run template §16.2 (13 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
 
 **Integrated Gate-A**: Sub-agent runs formal `gate_a_check.py` (no --dry-run) internally, fixes failures and re-runs until PASS. Returns rfc.md + Gate-A PASS output to orchestrator. Orchestrator trusts result, updates state directly (gate_a_result: "pass", current_phase: "gate_b") — no redundant re-run.
 
@@ -234,11 +234,11 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 | 1 | HARD | Structure match (template headings) |
 | 2 | HARD | ID uniqueness (HR/DEC/SCN/REQ/EVD) |
 | 3 | HARD | No placeholders (TBD/XXX/TODO/FIXME) |
-| 4 | HARD | Expression rules (WHEN/AND/THEN format) |
-| 5 | HARD | Readability (review + normative keyword coverage) |
-| 6 | HARD | SCN category coverage (6 categories) |
+| 4 | HARD | Expression rules (Mermaid brackets, fenced block tags) |
+| 5 | HARD | Readability (SCN WHEN/THEN lines, paragraph length) |
+| 6 | HARD | SCN category coverage (5 minimum categories) |
 | 7 | HARD | Evidence cross-check (EVD citations valid) |
-| 8 | HARD | Strictness requirements (coverage matrix, option sets) |
+| 8 | HARD | Strictness visibility (strictness field + upgrade DEC) |
 | 9 | HARD | Trigger declarations (§14 format) |
 | 10 | HARD | HR-SCN binding integrity |
 | 11 | HARD | DEC alternatives documented |

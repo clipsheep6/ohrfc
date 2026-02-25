@@ -27,6 +27,8 @@ from gate_a_check import (
     check_18_diagram_text_pairing,
     check_19_unresolved_format,
     check_20_orphan_scn,
+    check_21_cross_section_redundancy,
+    check_22_impl_detail_in_design,
     run_gate_a,
     extract_ids,
     extract_defined_ids,
@@ -843,9 +845,9 @@ class TestCheck14SectionNonEmpty(unittest.TestCase):
         self.assertTrue(any("背景" in i for i in r.issues))
 
 
-# === Check 15: Diagram-text pairing (SOFT) ===
+# === Check 18: Diagram-text pairing (SOFT) ===
 
-class TestCheck15DiagramTextPairing(unittest.TestCase):
+class TestCheck18DiagramTextPairing(unittest.TestCase):
     def test_pass_mermaid_with_surrounding_text(self):
         """Mermaid block with text nearby should pass."""
         rfc = "这是描述文字\n```mermaid\nflowchart LR\n  A --> B\n```\n后续说明\n"
@@ -868,9 +870,9 @@ class TestCheck15DiagramTextPairing(unittest.TestCase):
         self.assertTrue(r.passed, "Soft check should always have passed=True")
 
 
-# === Check 16: Unresolved format (SOFT) ===
+# === Check 19: Unresolved format (SOFT) ===
 
-class TestCheck16UnresolvedFormat(unittest.TestCase):
+class TestCheck19UnresolvedFormat(unittest.TestCase):
     def test_pass_unresolved_with_owner(self):
         """Unresolved item with owner keyword should pass."""
         rfc = "## Hard-Unresolved\n- owner: Alice, action: 确认接口, convergence: 2026-03-01\n"
@@ -890,9 +892,9 @@ class TestCheck16UnresolvedFormat(unittest.TestCase):
         self.assertEqual(len(r.warnings), 0)
 
 
-# === Check 17: Orphan SCN (SOFT) ===
+# === Check 20: Orphan SCN (SOFT) ===
 
-class TestCheck17OrphanSCN(unittest.TestCase):
+class TestCheck20OrphanSCN(unittest.TestCase):
     def test_pass_all_scns_referenced(self):
         """SCNs referenced by HR or triggers should pass."""
         r = check_20_orphan_scn(MINIMAL_RFC)
@@ -919,6 +921,115 @@ class TestCheck17OrphanSCN(unittest.TestCase):
         rfc = "# RFC\n## 1. 背景\n内容\n"
         r = check_20_orphan_scn(rfc)
         self.assertEqual(len(r.warnings), 0)
+
+
+# === Check 21: Cross-section redundancy (SOFT) ===
+
+class TestCheck21CrossSectionRedundancy(unittest.TestCase):
+    def test_pass_no_redundancy(self):
+        """No duplicated EVD/HR text across sections should produce no warnings."""
+        rfc = (
+            "## 1. 背景\n一些背景内容\n\n"
+            "## 8. 安全模型\nSEC-HR-001：禁止越权操作\n\n"
+            "## 11. 验收\nSCN-001: normal\n  WHEN x\n  THEN y\n"
+        )
+        evidence = {"items": []}
+        r = check_21_cross_section_redundancy(rfc, evidence)
+        self.assertEqual(len(r.warnings), 0, f"Expected no warnings but got: {r.warnings}")
+
+    def test_warn_evd_duplicated_across_sections(self):
+        """EVD with full context appearing in 3+ sections should warn."""
+        rfc = (
+            "## 1. 背景\nEVD-001：这是一段很长的证据来源描述文本用于测试跨章节冗余\n\n"
+            "## 5. 方案概览\nEVD-001：这是一段很长的证据来源描述文本用于测试跨章节冗余\n\n"
+            "## 8. 安全模型\nEVD-001：这是一段很长的证据来源描述文本用于测试跨章节冗余\n\n"
+        )
+        evidence = {"items": [{"evd_id": "EVD-001"}]}
+        r = check_21_cross_section_redundancy(rfc, evidence)
+        self.assertTrue(len(r.warnings) > 0, "Expected WARN for EVD duplicated across 3+ sections")
+        self.assertTrue(any("EVD-001" in w for w in r.warnings))
+
+    def test_warn_hr_rule_text_duplicated(self):
+        """HR rule text appearing verbatim in multiple sections should warn."""
+        rule_text = "禁止未经授权的用户访问敏感资源和关键系统组件"
+        rfc = (
+            f"## 8. 安全模型\nSEC-HR-001：{rule_text}\n\n"
+            f"## 11. 验收\n引用内容：{rule_text}\n\n"
+        )
+        evidence = {"items": []}
+        r = check_21_cross_section_redundancy(rfc, evidence)
+        self.assertTrue(len(r.warnings) > 0, f"Expected WARN for HR rule text duplication but got: {r.warnings}")
+
+    def test_soft_check_does_not_fail(self):
+        """Soft check should never set passed=False, only warn."""
+        rfc = (
+            "## 1. 背景\nEVD-001：这是一段很长的证据来源描述文本用于测试\n\n"
+            "## 5. 方案概览\nEVD-001：这是一段很长的证据来源描述文本用于测试\n\n"
+            "## 8. 安全模型\nEVD-001：这是一段很长的证据来源描述文本用于测试\n\n"
+        )
+        evidence = {"items": [{"evd_id": "EVD-001"}]}
+        r = check_21_cross_section_redundancy(rfc, evidence)
+        self.assertTrue(r.passed, "Soft check should always have passed=True")
+
+
+# === Check 22: §5 implementation detail (SOFT) ===
+
+class TestCheck22ImplDetailInDesign(unittest.TestCase):
+    def test_pass_no_impl_detail(self):
+        """§5 with only behavioral/design descriptions should produce no warnings."""
+        rfc = (
+            "## 5. 方案概览\n"
+            "本服务采用事件驱动架构。\n"
+            "请求经过网关层后进入核心业务逻辑。\n"
+            "异常情况下返回降级结果。\n"
+        )
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertEqual(len(r.warnings), 0, f"Expected no warnings but got: {r.warnings}")
+
+    def test_warn_method_signature_in_section5(self):
+        """§5 containing class.method() references should warn."""
+        rfc = (
+            "## 5. 方案概览\n"
+            "请求由 RequestHandler.processRequest() 处理。\n"
+        )
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertTrue(len(r.warnings) > 0, "Expected WARN for class/method reference in §5")
+
+    def test_warn_impl_type_keyword_in_section5(self):
+        """§5 containing implementation type keywords (mutex, lock, etc.) should warn."""
+        rfc = (
+            "## 5. 方案概览\n"
+            "使用 mutex 保护共享状态的并发访问。\n"
+        )
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertTrue(len(r.warnings) > 0, "Expected WARN for impl-level keyword in §5")
+
+    def test_pass_no_section5(self):
+        """No §5 section should trivially pass."""
+        rfc = "## 1. 背景\n内容\n"
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertEqual(len(r.warnings), 0)
+
+    def test_pass_impl_in_code_block_ignored(self):
+        """Implementation keywords inside code blocks in §5 should be ignored."""
+        rfc = (
+            "## 5. 方案概览\n"
+            "```text\n"
+            "mutex lock atomic std::vector\n"
+            "```\n"
+            "这是正常的方案描述。\n"
+        )
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertEqual(len(r.warnings), 0, f"Expected no warnings for code block content: {r.warnings}")
+
+    def test_soft_check_does_not_fail(self):
+        """Soft check should never set passed=False, only warn."""
+        rfc = (
+            "## 5. 方案概览\n"
+            "使用 mutex 和 RWLock 保护状态。\n"
+        )
+        r = check_22_impl_detail_in_design(rfc)
+        self.assertTrue(r.passed, "Soft check should always have passed=True")
 
 
 # === 3-State Output Format ===
@@ -1156,12 +1267,17 @@ class TestConfigToggle(unittest.TestCase):
             "check_18_diagram_text_pairing": {"enabled": True},
             "check_19_unresolved_format": {"enabled": False},
             "check_20_orphan_scn": {"enabled": False},
+            "check_21_cross_section_redundancy": {"enabled": False},
+            "check_22_impl_detail_in_design": {"enabled": False},
         }
         rfc = MINIMAL_RFC
+        evidence = {"items": []}
         configurable_soft = [
             ("check_18_diagram_text_pairing", lambda: check_18_diagram_text_pairing(rfc)),
             ("check_19_unresolved_format", lambda: check_19_unresolved_format(rfc)),
             ("check_20_orphan_scn", lambda: check_20_orphan_scn(rfc)),
+            ("check_21_cross_section_redundancy", lambda: check_21_cross_section_redundancy(rfc, evidence)),
+            ("check_22_impl_detail_in_design", lambda: check_22_impl_detail_in_design(rfc)),
         ]
         results = []
         for check_name, check_fn in configurable_soft:
@@ -1184,7 +1300,7 @@ class TestDryRunMode(unittest.TestCase):
     """Tests for --dry-run flag (v2.7.0): advisory mode, output prefixing, exit code."""
 
     def _run_checks(self, rfc, evidence=None):
-        """Helper: run the original 9 hard checks + 3 soft checks and return report.
+        """Helper: run the original 9 hard checks + 5 soft checks and return report.
 
         Uses only checks 1-9 (the always-on hard checks) to match MINIMAL_RFC's
         design. Checks 10-14 require richer RFC content not present in MINIMAL_RFC.
@@ -1209,6 +1325,8 @@ class TestDryRunMode(unittest.TestCase):
             check_18_diagram_text_pairing(rfc),
             check_19_unresolved_format(rfc),
             check_20_orphan_scn(rfc),
+            check_21_cross_section_redundancy(rfc, evidence),
+            check_22_impl_detail_in_design(rfc),
         ]
         report = run_gate_a(hard_results, soft_results)
         return hard_results, soft_results, report
