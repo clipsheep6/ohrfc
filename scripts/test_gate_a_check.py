@@ -298,6 +298,26 @@ class TestCheck9Triggers(unittest.TestCase):
         r = check_9_triggers(rfc)
         self.assertFalse(r.passed)
 
+    def test_pass_trigger_section_with_gate_declaration_heading(self):
+        """Trigger section using '## 14. 门禁声明' heading (template default) should be found."""
+        rfc = (
+            "# RFC\ntemplate_id: x\ntemplate_version: x\nstrictness: L2\n"
+            "## 1. 背景\n现状描述\n"
+            "## 7. 关键决策与取舍\nDEC-001：选择方案 A\n"
+            "## 8. 安全模型\nSEC-HR-001：规则（关联：SCN-010）\n"
+            "## 11. 验收\n"
+            "### 11.2 正常路径\nSCN-001: normal / 正常请求\n  WHEN x\n  THEN y\n"
+            "### 11.3 权限/越权\nSCN-010: reject_authz / 越权拒绝\n  WHEN x\n  THEN y\n"
+            "## 14. 门禁声明\n"
+            "### 14.1 触发器声明\n"
+            "- 新增/变更信任边界或权限模型：YES（Links: SEC-HR-001, SCN-010）\n"
+            "- 新增/变更资源预算/降级口径：NO\n"
+            "- 新增/变更恢复链路：NO\n"
+            "- 兼容性行为变化：NO\n"
+        )
+        r = check_9_triggers(rfc)
+        self.assertTrue(r.passed, f"Expected PASS for '门禁声明' heading but got: {r.issues}")
+
 
 class TestHelpers(unittest.TestCase):
     def test_extract_defined_ids(self):
@@ -808,6 +828,19 @@ class TestCheck13CoverageMatrix(unittest.TestCase):
         """L3/Full with a risk→SCN table should pass."""
         r = check_13_coverage_matrix(FULL_L3_RFC)
         self.assertTrue(r.passed, f"Expected PASS but got: {r.issues}")
+
+    def test_pass_l2_with_risk_coverage_summary_section(self):
+        """L2 with a '风险覆盖摘要' section containing risk→SCN mapping should pass."""
+        rfc = (
+            "# RFC\nstrictness: L2\n"
+            "## 11. 验收\n"
+            "### 11.1.1 风险覆盖摘要\n"
+            "| 风险维度 | SCN | 说明 |\n"
+            "|------|-----|------|\n"
+            "| 兼容性回归 | SCN-001 | 行为不变 |\n"
+        )
+        r = check_13_coverage_matrix(rfc)
+        self.assertTrue(r.passed, f"Expected PASS for '风险覆盖摘要' section but got: {r.issues}")
 
 
 # === Check 14: Section non-empty ===

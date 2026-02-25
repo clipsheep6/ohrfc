@@ -133,7 +133,7 @@ python3 scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard
 ```
 
 **Summary**:
-1. Confirm strictness (default Standard; Light/Full must be explicitly requested) via AskUserQuestion if not specified:
+1. **Confirm strictness (mandatory)**: Always ask the user to select strictness level before proceeding, unless they already explicitly stated one (e.g., "Light mode" / "用 Full") in their initial request. Present options via structured user interaction:
    - **Light**: ~3-5 轮交互，跳过语义评审(Gate-B)，适合低风险明确需求
    - **Standard**: ~8-15 轮交互，含双质量门(Gate-A + Gate-B)，平衡质量与效率
    - **Full**: ~15-25 轮交互，多模型多角色评审，适合高风险架构决策
@@ -317,14 +317,14 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 
 **Summary**:
 1. **RFC Briefing** (non-interactive): Display concise RFC overview before mode selection — title/scope, TL;DR (3-6 points), key DEC decisions, top HR constraints (≤5), must-pass SCN (≤5), accepted risks
-2. **Mode selection** via AskUserQuestion: Standard / Progressive (推荐) / Interactive
+2. **Mode selection (mandatory)**: Always present review mode options to the user via AskUserQuestion before executing any review. Do NOT silently default to any mode.
 3. Execute selected mode
 4. Approve → state: baseline_accepted=true, phase=finalize
 5. Reject → write rejection as DEC/CHG → state: phase=design
 
 **Review Modes**:
 - **Mode A: Standard Review** (default) — present rfc.md, binary approve/reject
-- **Mode C: Progressive Review** — AI-guided risk-prioritized review with thinking models + Socratic challenges; AI recommends, user decides (recommended for Standard strictness)
+- **Mode C: Progressive Review** — AI-guided risk-prioritized review with thinking models + Socratic challenges; presents issues one-at-a-time, AI recommends, user decides (recommended for Standard strictness)
 - **Mode B: Interactive Review** — full section-by-section walkthrough with isolated sub-agent providing multi-perspective AI analysis; supports chapter selection + early exit (recommended for Full strictness / high-risk RFCs)
 
 **Event**: Write `phase_end` event to `.debug/events.jsonl`:

@@ -617,16 +617,14 @@ def check_9_triggers(rfc: str) -> CheckResult:
     """Check 9: Trigger declarations (S14 or equivalent trigger block)."""
     r = CheckResult("9. Trigger declarations")
 
-    # Find trigger section (match heading then capture until next same-or-higher-level heading)
-    trigger_section = re.search(
-        r'(?:#{1,4}\s*.*?(?:触发器|trigger|门禁触发|Gate Trigger).*?)\n(.*?)(?=\n#{1,3}\s|\Z)',
-        rfc, re.DOTALL | re.IGNORECASE
-    )
-    if not trigger_section:
+    # Find trigger section using _extract_section for proper heading-level handling
+    # This correctly captures content under '## 14. 门禁声明' including subsections like '### 14.1 触发器声明'
+    trigger_section_text = _extract_section(rfc, r'(?:触发器|trigger|门禁触发|门禁声明|门禁|Gate Trigger)')
+    if not trigger_section_text:
         r.fail("No trigger declaration section found (expected §14 or equivalent)")
         return r
 
-    trigger_text = trigger_section.group(1)
+    trigger_text = trigger_section_text
     trigger_lines = trigger_text.split('\n')
 
     # Collect all defined IDs in the rfc for cross-reference validation
@@ -888,7 +886,7 @@ def check_13_coverage_matrix(rfc: str) -> CheckResult:
     # Standard (L2) and Full (L3) require coverage matrix
     # Look for a table in §11 or a coverage matrix section
     section_11 = _extract_section(rfc, r'(?:11|验收)')
-    coverage_section = _extract_section(rfc, r'(?:覆盖矩阵|coverage.?matrix|SCN.?覆盖)')
+    coverage_section = _extract_section(rfc, r'(?:覆盖矩阵|coverage.?matrix|SCN.?覆盖|风险覆盖)')
 
     search_text = (section_11 or '') + '\n' + (coverage_section or '')
 
@@ -1232,7 +1230,7 @@ def check_20_orphan_scn(rfc: str) -> CheckResult:
 
     # Also check trigger Links for SCN references
     trigger_scns: Set[str] = set()
-    trigger_section = _extract_section(rfc, r'(?:触发器|trigger|门禁触发|Gate Trigger)')
+    trigger_section = _extract_section(rfc, r'(?:触发器|trigger|门禁触发|门禁声明|门禁|Gate Trigger)')
     if trigger_section:
         for m in re.finditer(r'SCN-\d{3,}', trigger_section):
             trigger_scns.add(m.group())

@@ -30,9 +30,9 @@ Before presenting the mode selection AskUserQuestion, display a concise RFC cont
 
 **Relationship to Mode A**: Mode A subsequently presents rfc.md content in detail (full text for short docs, key-section summary for long docs). The Briefing is a more concise overview (~10-15 lines) to inform mode selection; Mode A's presentation is for the approval decision itself. They do not conflict.
 
-### Mode Selection
+### Step 2: Mode Selection (mandatory)
 
-**Mode selection**: Present review mode options via AskUserQuestion:
+**Mode selection (mandatory)**: Present review mode options via AskUserQuestion. Do NOT skip or silently default to any mode — the user must explicitly choose.
 
 ```
 AskUserQuestion:
@@ -101,6 +101,8 @@ Merge strategy: related low-priority items are grouped under the highest-severit
 
 **Step 2: High-Priority Guided Review** (max 4 rounds AskUserQuestion)
 
+**Each round presents exactly 1 high-priority focus item** (with its related lower-priority items, if any). Do NOT batch multiple independent findings into a single round. NEVER present all findings at once — the purpose of Progressive Review is to save user attention by stepping through issues one at a time.
+
 Present Focus Items from high to low severity. Each round:
 1. Show finding summary + thinking model analysis result
 2. Present Socratic challenge question (guide user thinking)
@@ -109,7 +111,7 @@ Present Focus Items from high to low severity. Each round:
    - Alternative action(s)
    - "跳过此项" (defer to Step 3 batch)
 
-Related lower-priority items are shown alongside their parent high-priority item.
+Related lower-priority items are shown alongside their parent high-priority item (not as separate rounds).
 Upper bound: 4 rounds of AskUserQuestion. Remaining items overflow to Step 3.
 
 **Step 3: Low-Risk Batch Confirmation** (1 round AskUserQuestion)

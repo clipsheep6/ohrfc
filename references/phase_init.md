@@ -77,7 +77,7 @@ Read: assets/schemas/state.schema.json (state tracking fields)
 
 ## Execution Sequence
 
-1. **Confirm strictness**: If user didn't specify → AskUserQuestion (default Standard). If specified → use directly.
+1. **Confirm strictness (mandatory)**: Always ask the user to select strictness level before proceeding, unless they already explicitly stated one (e.g., "Light mode" / "用 Full") in their initial request. Do NOT silently default to Standard — the user must actively confirm their choice.
    - **Light**: "~3-5 轮交互，跳过语义评审(Gate-B)，适合低风险明确需求"
    - **Standard (推荐)**: "~8-15 轮交互，含双质量门(Gate-A + Gate-B)，平衡质量与效率"
    - **Full**: "~15-25 轮交互，多模型多角色评审，适合高风险架构决策"
