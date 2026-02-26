@@ -5,8 +5,10 @@
 ## Preferred: Script Execution
 
 ```bash
-python3 scripts/ohrfc_init.py <rfc_id> <rfc_title> [--strictness standard]
+python3 <skill_dir>/scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard] --project-dir <user_project_dir>
 ```
+
+**CRITICAL — Path Convention**: `<skill_dir>` is the skill root directory (where `scripts/`, `references/` live). `<user_project_dir>` is the directory where the user invoked `/ohrfc` — this is where `.ohrfc/` workspaces will be created. These two paths are DIFFERENT. Never omit `--project-dir`; without it the script defaults to CWD, which may be the skill directory rather than the user's project.
 
 The script performs steps 2-5 below automatically. Only step 1 (strictness confirmation) requires prior user interaction if not specified via `--strictness`.
 
@@ -17,10 +19,10 @@ When `/ohrfc` is triggered, the orchestrator first checks for existing workspace
 ### Detection
 
 ```bash
-python3 scripts/ohrfc_init.py scan
+python3 <skill_dir>/scripts/ohrfc_init.py scan --project-dir <user_project_dir>
 ```
 
-Returns JSON array of workspace status objects. If the array is empty, proceed directly to new-RFC flow (no AskUserQuestion needed).
+Returns JSON with `scanned_dir` (confirming which directory was scanned) and `workspaces` array. If the array is empty, proceed directly to new-RFC flow (no AskUserQuestion needed).
 
 ### Routing Logic
 
@@ -77,14 +79,16 @@ Read: assets/schemas/state.schema.json (state tracking fields)
 
 ## Execution Sequence
 
+> **Fallback path**: These manual steps are ONLY used when `ohrfc_init.py` script execution fails. Always attempt the script first. All `.ohrfc/` paths below are relative to the **user's project directory** (where `/ohrfc` was invoked), NOT the skill directory.
+
 1. **Confirm strictness (mandatory)**: Always ask the user to select strictness level before proceeding, unless they already explicitly stated one (e.g., "Light mode" / "用 Full") in their initial request. Do NOT silently default to Standard — the user must actively confirm their choice.
    - **Light**: "~3-5 轮交互，跳过语义评审(Gate-B)，适合低风险明确需求"
    - **Standard (推荐)**: "~8-15 轮交互，含双质量门(Gate-A + Gate-B)，平衡质量与效率"
    - **Full**: "~15-25 轮交互，多模型多角色评审，适合高风险架构决策"
 
-2. **Create workspace**:
+2. **Create workspace** (in user's project directory):
    ```
-   Bash: mkdir -p .ohrfc/<rfc_id>/.debug .ohrfc/<rfc_id>/.reviews
+   Bash: mkdir -p <user_project_dir>/.ohrfc/<rfc_id>/.debug <user_project_dir>/.ohrfc/<rfc_id>/.reviews
    ```
 
 3. **Generate rfc.md skeleton**:

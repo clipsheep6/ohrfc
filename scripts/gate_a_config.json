@@ -119,7 +119,7 @@
     },
     "check_22_impl_detail_in_design": {
       "enabled": true,
-      "description": "Warn when §5 contains implementation class names, method signatures, or sync primitives"
+      "description": "Warn when §6 contains implementation class names, method signatures, or sync primitives"
     }
   },
   "required_sections": [

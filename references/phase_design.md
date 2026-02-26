@@ -4,7 +4,7 @@
 
 ## Prerequisites (sub-agent context)
 
-**Sub-agent type**: `Task(Plan)` preferred (architectural reasoning optimized; has Read/Glob/Grep/Bash/MCP but no Write/Edit — orchestrator remains single-writer). Fallback: `Task(general-purpose)` if Plan unavailable.
+**Sub-agent type**: MUST use `Task(Plan)` (architectural reasoning optimized; has Read/Glob/Grep/Bash/MCP but no Write/Edit — orchestrator remains single-writer). See §1.2 Type Resolution for fallback chain.
 
 The DESIGN sub-agent must load:
 - `references/rfc_template.md` — section structure and fill-in skeleton
@@ -45,11 +45,16 @@ DESIGN execution uses a single sub-agent to write the complete rfc.md draft. The
 
 **Relation to gap-filling**: Fork escalation happens *during* DESIGN (direction decisions). Gap-filling reviewers run *after* DESIGN (completeness/quality checks). The two mechanisms are complementary and do not conflict.
 
-## Step 1: Fill Review Layer (rfc.md §1-§6)
+## Step 1: Fill Review Layer (rfc.md §1-§7)
 
 ### Socratic Pause Protocol
 
 Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) for each section's Socratic Pause — structured multi-step thinking helps surface non-obvious architectural trade-offs and cross-section dependencies.
+
+**Strictness-based Pause depth**:
+- **Full**: All sections use full Socratic Pause (sequential-thinking + Core + Section-fixed + Context-dynamic)
+- **Standard**: High-risk sections (§3-§9, §11) use full Pause; low-risk sections (§1, §2, §10) use **lightweight Pause** — answer Core C1+C2 and Section-fixed question via internal reasoning only (no `sequential-thinking` tool call, no context-dynamic scan). This saves ~3 tool calls without meaningful quality loss on descriptive/observability sections.
+- **Light**: All sections use lightweight Pause (internal reasoning only)
 
 At each section, the sub-agent MUST pause and answer internally:
 1. **Core (always)**: C1 "Are we solving symptoms or the ROOT problem?" + C2 "Looking back one year, would this still be the best choice?"
@@ -63,13 +68,13 @@ At each section, the sub-agent MUST pause and answer internally:
 | `evidence.json` with `truncated=true` | "Evidence E-{N} was truncated. Does this HR depend on that evidence?" | When writing HR that cites truncated evidence |
 | strictness=Full | "Under Full strictness, does this DEC need an option set (≥2 alternatives)?" | When writing DEC |
 | Security / trust boundary change in DISCOVER | "Trust boundary change → do we need SEC-HR + reject/abuse SCN?" | Before writing §8, check DISCOVER findings |
-| Compatibility risk in DISCOVER | "Is the default value strategy explicit? Is old behavior explicitly preserved?" | Before writing §6, check DISCOVER findings |
-| §5 中出现方法/类名 | "Could a developer achieve the same external behavior with a different class/method name? If yes, abstract to functional role." | 编写 §5.1/§5.3 时 |
-| §5.2 中出现同步原语 | "Is this a concurrency REQUIREMENT (no data race) or an implementation CHOICE (use mutex)? Only the former belongs." | 编写 §5.2 时 |
+| Compatibility risk in DISCOVER | "Is the default value strategy explicit? Is old behavior explicitly preserved?" | Before writing §7, check DISCOVER findings |
+| §6 中出现方法/类名 | "Could a developer achieve the same external behavior with a different class/method name? If yes, abstract to functional role." | 编写 §6.1/§6.3 时 |
+| §6.2 中出现同步原语 | "Is this a concurrency REQUIREMENT (no data race) or an implementation CHOICE (use mutex)? Only the former belongs." | 编写 §6.2 时 |
 
 #### Emergent Fork Escalation
 
-When Socratic Pause reveals a fork (§5 or §7: "Why this over the 2nd best?" has no clear answer):
+When Socratic Pause reveals a fork (§6 or §5: "Why this over the 2nd best?" has no clear answer):
 
 **Escalation criteria** — escalate to user when ANY of:
 1. **No dominant option**: No single option dominates on ≥2 of 3 axes (performance / complexity / maintainability)
@@ -81,7 +86,7 @@ If none of the 3 criteria are met → sub-agent selects the recommended approach
 **Escalation signal format** (returned to orchestrator):
 ```text
 FORK_ESCALATION:
-  section: §5 / §7
+  section: §6 / §5
   description: <what the fork is about>
   criteria_met: [1|2|3]  # which escalation criteria triggered
   option_a: { summary, trade_offs, affected_ids[] }
@@ -101,11 +106,11 @@ FORK_ESCALATION:
 
 Only proceed to write after all Pause questions are answered satisfactorily (including any fork escalation resolution).
 
-- §1 背景:
+- §1 背景: *(lightweight Pause in Standard)*
   - **Pause**: "What's the ONE fact that, if wrong, invalidates everything below?"
   - Write: Current state + why now (facts, no code)
 
-- §2 用户痛点:
+- §2 用户痛点: *(lightweight Pause in Standard)*
   - **Pause**: "Is this the user's REAL pain, or what we ASSUME they feel?"
   - Write: User-perceivable problems only (no internal terms)
 
@@ -113,19 +118,19 @@ Only proceed to write after all Pause questions are answered satisfactorily (inc
   - **Pause**: "What goal, if NOT achieved, makes the whole project pointless?"
   - Write: Verifiable goals (4 quality categories) + success criteria table + glossary
 
-- §4 一页结论 (write LAST — synthesize from §1-§3, §5-§6):
+- §4 一页结论 (write LAST — synthesize from §1-§3, §6-§7):
   - **Pause**: "Are these conclusions decidable? Can someone say YES/NO to each?"
   - Write: 3-6 decidable conclusions + impact table + must-pass SCN set + quality closure summary + reading guide
 
-- §7 关键决策:
+- §5 关键决策:
   - **Pause per DEC**: "Why this over the 2nd best? What's the strongest counterargument?"
   - Write: DEC-### with alternatives + rationale + trade-offs; Unresolved table (Hard/Soft)
 
-- §5 方案概览:
+- §6 方案概览:
   - **Pause**: "Is this the simplest design that satisfies ALL constraints?"
   - Write: End-to-end main path + contracts + design diagrams (A: architecture/boundary, B: interaction sequence, C: failure/convergence) + Notes per diagram
 
-  **§5 抽象层级规则**:
+  **§6 抽象层级规则**:
   设计文档定义行为契约和性能边界，不预设实现方式。
 
   ❌ "模块 A 调用 ModuleB.getData() 获取 vector<pair<int, shared_ptr<Channel>>>"
@@ -137,15 +142,15 @@ Only proceed to write after all Pause questions are answered satisfactorily (inc
   ❌ "使用 unordered_map 实现 O(1) 查询"
   ✅ "O(1) 查询复杂度（如通过哈希表实现）"
 
-- §6 影响分析与兼容性:
+- §7 影响分析与兼容性:
   - **Pause**: "What downstream change triggers a cascade we haven't mapped?"
   - Write: Unchanged/changed/default strategy + breaking changes + rollback + evidence spot-checks
 
 ## Step 2: Fill Normative Layer (rfc.md §8-§11)
 
-> **Cross-Section Deduplication**: Before writing §8/§9/§11, check if the constraint/scenario is already expressed in §5.2 (contracts) or §7 (decisions). If so, write a back-reference ('see DEC-###') instead of re-expressing the full logic. Each behavioral fact should have ONE authoritative location; other sections link to it.
+> **Cross-Section Deduplication**: Before writing §8/§9/§11, check if the constraint/scenario is already expressed in §6.2 (contracts) or §5 (decisions). If so, write a back-reference ('see DEC-###') instead of re-expressing the full logic. Each behavioral fact should have ONE authoritative location; other sections link to it.
 
-Same Socratic Pause Protocol applies (Core C1+C2 + Section-fixed + Context-dynamic).
+Same Socratic Pause Protocol applies (Core C1+C2 + Section-fixed + Context-dynamic), respecting the strictness-based Pause depth defined above (§10 uses lightweight Pause in Standard).
 
 - §8 安全模型:
   - **Pause**: "What's the cheapest attack with highest impact we haven't covered?"
@@ -155,7 +160,7 @@ Same Socratic Pause Protocol applies (Core C1+C2 + Section-fixed + Context-dynam
   - **Pause**: "Assume 3AM failure, no one on-call. What happened? Trace back."
   - Write: REL-HR rules → why → SCN → invariants/forbidden states
 
-- §10 可观测性:
+- §10 可观测性: *(lightweight Pause in Standard)*
   - **Pause**: "How would we NOT know the system is broken?"
   - Write: Minimum observability requirements + SCN binding
 
@@ -163,12 +168,12 @@ Same Socratic Pause Protocol applies (Core C1+C2 + Section-fixed + Context-dynam
   - **Pause**: "What single test failure would prove our entire design is wrong?"
   - Write: 5-category SCN (per methodology.md §8) + must-pass set + risk coverage matrix
 
-## Step 3: Fill Gates/Release/Appendix (rfc.md §12-§16)
+## Step 3: Fill Gates/Release/Appendix (rfc.md §12-§15)
 
 - §12 变更记录 (if post-baseline)
-- §14 门禁声明: Trigger declarations YES/NO + Links (Gate-A checks this mechanically)
-- §15 发布元信息
-- §16 角色 + 11-item self-check + document meta (template_id/template_version/strictness)
+- §13 门禁声明: Trigger declarations YES/NO + Links (Gate-A checks this mechanically)
+- §14 发布元信息
+- §15 角色 + 11-item self-check + document meta (template_id/template_version/strictness)
 
 ## Parallel Gap-Filling (optional)
 
@@ -201,7 +206,7 @@ Apply these lenses during self-check:
 
 ### Check Items
 
-Run template §16.2 self-check (13 items), then these 6 additional checks:
+Run template §15.2 self-check (13 items), then these 6 additional checks:
 
 - [ ] **Structure**: All sections present, meta triple filled
 - [ ] **Expression**: All SCN use WHEN/AND/THEN on separate lines; no wall-of-text (per methodology.md §5)
@@ -218,7 +223,7 @@ Any failed → Fix and re-check (do NOT enter GATE)
 After self-check passes, run formal Gate-A inside the DESIGN sub-agent:
 
 ```bash
-python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json
+python3 <skill_dir>/scripts/gate_a_check.py <user_project_dir>/.ohrfc/<rfc_id>/rfc.md --evidence <user_project_dir>/.ohrfc/<rfc_id>/evidence.json
 ```
 
 - If PASS: capture output → proceed to Checkpoint Write → return rfc.md + Gate-A output to orchestrator

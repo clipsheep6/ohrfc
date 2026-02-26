@@ -14,7 +14,7 @@ The orchestrator does NOT read these files. It dispatches the sub-agent and hand
 
 ## Sub-step 1: QUICK_SCAN (5-10s, no user interaction)
 
-**Execution**: Launch as `Task(Explore)` sub-agent. Fallback: `Task(general-purpose)` if Explore unavailable. Model inherits from orchestrator by default; user can override at INIT.
+**Execution**: MUST launch as `Task(Explore)` sub-agent (read-only; see §1.2 Type Resolution for fallback chain). Model inherits from orchestrator by default; user can override at INIT.
 
 Execute bounded codebase scan:
 

@@ -13,10 +13,10 @@ None. All check logic is built into `scripts/gate_a_check.py`. No reference file
 
 ## Execution: Run Check Sequence
 
-**Preferred**: Run `scripts/gate_a_check.py` against rfc.md + evidence.json for automated checks.
+**Preferred**: Run `<skill_dir>/scripts/gate_a_check.py` against rfc.md + evidence.json for automated checks.
 
 ```bash
-python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json
+python3 <skill_dir>/scripts/gate_a_check.py <user_project_dir>/.ohrfc/<rfc_id>/rfc.md --evidence <user_project_dir>/.ohrfc/<rfc_id>/evidence.json
 ```
 
 Exit code 0 = PASS, 1 = FAIL. Stdout contains per-check results.
@@ -42,7 +42,7 @@ Fall through to normal execution only if: (a) no sub-agent Gate-A result availab
 
 ## Gate-A FAIL Fix Delegation
 
-When Gate-A reports FAIL, the orchestrator dispatches a `Task(general-purpose)` sub-agent to fix the failing items (see §1.2 agent type compatibility rule for CLI fallback). The orchestrator provides:
+When Gate-A reports FAIL, the orchestrator dispatches a `Task(general-purpose)` sub-agent to fix the failing items (see §1.2 Type Resolution for fallback chain). The orchestrator provides:
 1. The Gate-A failure output (section/ID locations + fix suggestions)
 2. Current rfc.md content
 3. evidence.json content (if evidence-related failures)

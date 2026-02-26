@@ -52,7 +52,7 @@ AskUserQuestion:
 
 1. **Present rfc.md** to user:
    - For short docs (< 200 lines): show full text
-   - For long docs: show key-section summary (§4 TL;DR + §11 must-pass + §14 triggers) with offer to show full text
+   - For long docs: show key-section summary (§4 TL;DR + §11 must-pass + §13 triggers) with offer to show full text
 
 2. **Collect decision** via AskUserQuestion:
    - Option A: Approve (accept as baseline)
@@ -87,7 +87,7 @@ Use `mcp__sequential-thinking__sequentialthinking` (or internal reasoning) to ap
 | Future Look-back | "2 年后这些决策还成立吗？" | Assumption expiry, scalability limits |
 | Socratic Challenge | "我们在解决症状还是根因？" | Root cause vs symptom fixes |
 | Brevity | "如果删除这个章节，是否有规范性信息丢失？" | Sections where >80% restates other sections |
-| Abstraction | "§5 描述的是系统做什么和为什么，还是怎么实现的？" | §5 class names, method signatures, sync primitives |
+| Abstraction | "§6 描述的是系统做什么和为什么，还是怎么实现的？" | §6 class names, method signatures, sync primitives |
 
 Output: **Risk-sorted Focus Items list**, each containing:
 - `location`: section + ID (e.g., "§5 DEC-003")
@@ -174,15 +174,15 @@ AskUserQuestion:
   options:
     - label: "§3-4 约束与范围"
       description: "{N} 个 Gate-B findings"
-    - label: "§5 方案架构"
+    - label: "§6 方案架构"
       description: "{N} 个 Gate-B findings"
-    - label: "§7 决策与权衡"
+    - label: "§5 决策与权衡"
       description: "{N} 个 Gate-B findings"
     - label: "§8-9 安全与可靠性"
       description: "{N} 个 Gate-B findings"
     - label: "§11 验收场景"
       description: "{N} 个 Gate-B findings"
-    - label: "§13-14 未决项与触发器"
+    - label: "§5.1 & §13 未决项与触发器"
       description: "{N} 个 Gate-B findings"
     - label: "整体评估"
       description: "跨章节一致性 + 最终裁决"
@@ -199,13 +199,13 @@ AskUserQuestion:
    - Thinking lens: First Principles — "What axioms are assumed? What if wrong?"
    - User: Confirm / Request changes / Early approve (approve all remaining sections)
 
-2. **§5 Solution Architecture**
+2. **§6 Solution Architecture**
    - AI analysis: diagram-text consistency, component boundary clarity, interaction flow completeness
    - Thinking lens: Systems Thinking — "Feedback loops? Emergent behaviors? Cross-system coupling?"
    - Gate-B findings summary (if available): P0/P1 items in this section
    - User: Confirm / Request changes / Early approve
 
-3. **§7 Decisions & Trade-offs**
+3. **§5 Decisions & Trade-offs**
    - AI analysis: every DEC has alternatives or single-path justification, residual risks explicit
    - Thinking lens: Future Look-back — "Will these trade-offs still make sense in 2 years? What assumptions expire?"
    - User: Confirm / Request changes / Early approve
@@ -221,7 +221,7 @@ AskUserQuestion:
    - Thinking lens: Test Thinking — "For each SCN, what does a failing test look like?"
    - User: Confirm / Request changes / Early approve
 
-6. **§13 Unresolved & §14 Triggers**
+6. **§5.1 Unresolved & §13 Triggers**
    - AI analysis: Hard-Unresolved = 0 verified, Soft-Unresolved has owner+action, trigger format valid
    - Thinking lens: Long-term evolution — "Which Soft-Unresolved items will become urgent? What's the escalation path?"
    - User: Confirm / Request changes / Early approve

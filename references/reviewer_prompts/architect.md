@@ -11,7 +11,7 @@ Focus on **structural soundness, boundary clarity, and design coherence**:
 3. **Contract completeness**: Are defaults, illegal values, close/disable semantics, and scope isolation specified?
 4. **Diagram-text consistency**: Do architecture/sequence/state diagrams match the text descriptions? Any normative info buried only in diagrams?
 5. **Impact & compatibility**: Are unchanged/changed behaviors clearly separated? Is rollback strategy viable?
-6. **Design coherence**: Do §5 (solution), §7 (decisions), §8-9 (security/reliability), and §11 (acceptance) tell a consistent story?
+6. **Design coherence**: Do §6 (solution), §5 (decisions), §8-9 (security/reliability), and §11 (acceptance) tell a consistent story?
 
 ## Thinking Lenses
 

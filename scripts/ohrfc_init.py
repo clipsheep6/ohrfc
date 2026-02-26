@@ -180,9 +180,15 @@ def validate_state_against_schema(state: dict, skill_dir: Path) -> list[str]:
     return errors
 
 
-def scan_workspaces() -> list[dict]:
-    """Scan .ohrfc/ for existing workspaces and return status info."""
-    ohrfc_dir = Path(".ohrfc")
+def scan_workspaces(project_dir: str | None = None) -> list[dict]:
+    """Scan .ohrfc/ for existing workspaces and return status info.
+
+    Args:
+        project_dir: User's project root directory. If provided, scans
+            <project_dir>/.ohrfc/. If None, falls back to CWD/.ohrfc/.
+    """
+    base = Path(project_dir) if project_dir else Path.cwd()
+    ohrfc_dir = base / ".ohrfc"
     if not ohrfc_dir.exists():
         return []
 
@@ -222,7 +228,12 @@ def main():
     subparsers = parser.add_subparsers(dest="command")
 
     # Subcommand: scan
-    subparsers.add_parser("scan", help="Scan existing workspaces and report status")
+    scan_parser = subparsers.add_parser("scan", help="Scan existing workspaces and report status")
+    scan_parser.add_argument(
+        "--project-dir",
+        default=None,
+        help="User's project root directory to scan for .ohrfc/ workspaces (default: CWD)",
+    )
 
     # Subcommand: create (default behavior)
     create_parser = subparsers.add_parser("create", help="Create a new RFC workspace")
@@ -238,6 +249,11 @@ def main():
         "--skill-dir",
         default=None,
         help="Path to skill root directory (auto-detected if omitted)",
+    )
+    create_parser.add_argument(
+        "--project-dir",
+        default=None,
+        help="User's project root directory where .ohrfc/ will be created (default: CWD)",
     )
 
     args = parser.parse_args()
@@ -256,18 +272,25 @@ def main():
             default="standard",
         )
         create_parser_compat.add_argument("--skill-dir", default=None)
+        create_parser_compat.add_argument("--project-dir", default=None)
         args = create_parser_compat.parse_args()
         args.command = "create"
 
     if args.command == "scan":
-        workspaces = scan_workspaces()
-        print(json.dumps(workspaces, ensure_ascii=False, indent=2))
+        project_dir = args.project_dir
+        workspaces = scan_workspaces(project_dir)
+        scanned_path = Path(project_dir) if project_dir else Path.cwd()
+        print(json.dumps({
+            "scanned_dir": str(scanned_path),
+            "workspaces": workspaces,
+        }, ensure_ascii=False, indent=2))
         return
 
-    # --- create command (original logic, unchanged) ---
-    # Resolve paths
+    # --- create command ---
+    # Resolve project dir (where .ohrfc/ lives)
+    project_base = Path(args.project_dir) if args.project_dir else Path.cwd()
     skill_dir = find_skill_dir(args.skill_dir)
-    workspace = Path(f".ohrfc/{args.rfc_id}")
+    workspace = project_base / ".ohrfc" / args.rfc_id
 
     if workspace.exists():
         print(f"ERROR: Workspace already exists: {workspace}", file=sys.stderr)

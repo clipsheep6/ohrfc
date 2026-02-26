@@ -11,7 +11,7 @@ Focus on **acceptance scenario quality, coverage completeness, and falsifiabilit
 3. **Must-pass set**: Does the must-pass set cover the highest-risk scenarios? Are all must-pass SCNs actually defined?
 4. **Risk coverage matrix**: Does §11 risk coverage summary map risks → SCNs → must-pass? Any risks without verification?
 5. **Boundary conditions**: Are edge cases covered (zero values, max values, empty/null, concurrent access, user switching)?
-6. **Regression**: Can the "unchanged behaviors" from §6 be verified? Are backward-compatibility guarantees testable?
+6. **Regression**: Can the "unchanged behaviors" from §7 be verified? Are backward-compatibility guarantees testable?
 7. **Observability SCN**: Can the observability requirements (§10) be verified through SCN?
 
 ## Thinking Lenses

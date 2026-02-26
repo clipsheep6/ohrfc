@@ -76,7 +76,7 @@ One-liner excerpts of design decisions (DEC) and historical rationale (HR) relev
 ```text
 context:
   - DEC-004: Chose policy-pull over push — reduces coupling to config service
-  - HR: Previous implementation had race condition on concurrent policy reload (see §7 DEC-004)
+  - HR: Previous implementation had race condition on concurrent policy reload (see §5 DEC-004)
 ```
 
 ### 2.6 `on-ambiguity` (fade-out)
@@ -129,11 +129,11 @@ on-ambiguity:
 Every task field should be traceable to its source section in rfc.md. Use HTML comment isolation for traceability annotations in generated task files:
 
 ```markdown
-<!-- TRACE: §6.1 → TASK-003.scope.modify -->
+<!-- TRACE: §7.1 → TASK-003.scope.modify -->
 <!-- TRACE: §11.3 → TASK-003.acceptance[SCN-003] -->
 <!-- TRACE: §8.1 SEC-HR-003 → TASK-003.invariants -->
-<!-- TRACE: §7 DEC-004 → TASK-003.context -->
-<!-- TRACE: §7.1 Hard-Unresolved → TASK-003.on-ambiguity -->
+<!-- TRACE: §5 DEC-004 → TASK-003.context -->
+<!-- TRACE: §5.1 Hard-Unresolved → TASK-003.on-ambiguity -->
 ```
 
 Traceability comments are placed at the end of the task file or within an appendix block. They do NOT appear inline within task field values.
@@ -146,22 +146,22 @@ Mapping from rfc.md sections to task fields:
 
 | rfc.md Section | Task Field | What to Extract |
 |----------------|------------|-----------------|
-| §6 (Impact/Scope Analysis) | `scope` | Affected files/modules → `modify`; unchanged boundaries → `boundary` |
+| §7 (Impact/Scope Analysis) | `scope` | Affected files/modules → `modify`; unchanged boundaries → `boundary` |
 | §11 (Acceptance Scenarios) | `acceptance` | SCN-### in WHEN/THEN format (filter by task scope) |
 | §8.1 / §9.1 (Security/Reliability Rules) | `invariants` | SEC-HR / REL-HR / INV relevant to task scope |
 | §9.4 (Invariants) | `invariants` | INV-### one-liners |
-| §1 TL;DR + §7 (Decisions) | `context` | DEC-### excerpts + historical rationale relevant to task |
-| §7.1 (Open Questions) | `on-ambiguity` | Hard/Soft unresolved items affecting this task's scope |
+| §1 TL;DR + §5 (Decisions) | `context` | DEC-### excerpts + historical rationale relevant to task |
+| §5.1 (Open Questions) | `on-ambiguity` | Hard/Soft unresolved items affecting this task's scope |
 
 **Generation process** (FINALIZE phase):
 
 1. Parse rfc.md §11 → group SCN-### by module/component affinity
 2. For each group, create a TASK with acceptance = grouped SCNs
-3. Fill `scope.modify` from §6 impact analysis (files/modules mapped to those SCNs)
+3. Fill `scope.modify` from §7 impact analysis (files/modules mapped to those SCNs)
 4. Fill `scope.boundary` from §4.2 non-goals + adjacent modules not in `modify`
 5. Fill `invariants` from §8.1 + §9.1 + §9.4 filtered to task scope
-6. Fill `context` from §7 DEC-### relevant to task scope
-7. Fill `on-ambiguity` from §7.1 unresolved items intersecting task scope
+6. Fill `context` from §5 DEC-### relevant to task scope
+7. Fill `on-ambiguity` from §5.1 unresolved items intersecting task scope
 8. Resolve `depends` from inter-task data/control flow analysis
 
 ---

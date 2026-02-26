@@ -55,6 +55,11 @@ Workspace: `.ohrfc/<rfc_id>/` containing `rfc.md`, `evidence.json`, `state.json`
 4. **No implementation code in rfc.md**: only contract-level structured expressions (fenced blocks with `text` or `contract` language tag, ≤30 lines).
 5. **Language**: user interaction follows user's language (default Chinese). Internal reasoning, sub-agent prompts, and code comments in English.
 6. **Checkpoint at phase boundaries**: Write structured reasoning checkpoint at DISCOVER exit, DESIGN exit, and Gate-B FAIL exit. See `references/checkpoint_protocol.md` for format, extraction prompts, and bootstrap protocol.
+7. **Path convention — skill dir vs project dir**: Two directories are involved in this workflow and they MUST NOT be confused:
+   - **`<skill_dir>`** = the directory containing this SKILL.md, `scripts/`, `references/`, `assets/` (e.g. `~/.claude/skills/ohrfc`). Used to locate scripts and reference files. **Never create `.ohrfc/` workspaces here.**
+   - **`<user_project_dir>`** = the directory where the user invoked `/ohrfc` (the user's current working directory at invocation time). This is where `.ohrfc/` workspaces are created and scanned. All artifact paths (`.ohrfc/<rfc_id>/rfc.md`, `evidence.json`, `state.json`) are relative to this directory.
+   - When calling scripts: `python3 <skill_dir>/scripts/<script>.py --project-dir <user_project_dir> ...`
+   - When creating files manually (fallback): always use absolute paths rooted at `<user_project_dir>`, e.g. `<user_project_dir>/.ohrfc/<rfc_id>/rfc.md`.
 
 ### 1.1 Context Budget
 
@@ -87,12 +92,23 @@ Sub-agents (isolated context):
   NEVER: AskUserQuestion | write rfc.md/state.json (evidence.json: delegated to EVIDENCE_TARGETED writer sub-agent only)
 ```
 
-**Agent type compatibility**: This workflow uses `Task(general-purpose)` as the default sub-agent type for tasks requiring file editing, bash execution, or structured output. Not all CLI environments recognize this type name. When dispatching `Task(general-purpose)` and the CLI reports an unknown/invalid agent type error, retry with `Task(general)` or any available agent type that provides Read + Edit + Write + Bash capabilities. This fallback rule applies to ALL `Task(general-purpose)` references throughout this document and phase references — individual call sites do not repeat this instruction.
+**Agent Type Resolution** (global — applies to all phase references):
+
+| Primary Type | Capability | Fallback Chain (on dispatch error only) |
+|-------------|------------|----------------------------------------|
+| `Task(Explore)` | Read-only (Glob/Grep/Read/MCP, no Write/Edit) | → `Task(general-purpose)` → `Task(general)` |
+| `Task(Plan)` | Read-only + architectural reasoning | → `Task(general-purpose)` → `Task(general)` |
+| `Task(general-purpose)` | Full (Read/Write/Edit/Bash) | → `Task(general)` |
+
+**Rules**:
+1. Each phase specifies a **primary type** in the Per-phase delegation table below. The orchestrator MUST attempt the primary type first.
+2. Fallback is triggered ONLY by an actual CLI dispatch error (agent type not recognized). Do NOT preemptively skip to a fallback type.
+3. When falling back from a read-only type (Explore/Plan) to a read-write type (general-purpose/general), the sub-agent prompt MUST still restrict the agent to read-only operations for that phase.
 
 Per-phase delegation:
 - **INIT**: Script (`ohrfc_init.py`). No sub-agent needed.
 - **DISCOVER**: Staged sub-agents: (1) single `Task(Explore)` for QUICK_SCAN + REASONING_PASS (serial), (2) orchestrator handles CLARIFY, (3) EVIDENCE_TARGETED two-phase: 1-3 parallel `Task(Explore)` agents search code and return EVD candidates → 1 `Task(general-purpose)` agent receives candidates and writes evidence.json directly. Orchestrator updates state.json only.
-- **DESIGN**: Single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft (orchestrator writes). Fallback: `Task(general-purpose)` if Plan unavailable. Optional: parallel gap-filling `Task(general-purpose)` reviewers + 1 merge sub-agent.
+- **DESIGN**: Single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft (orchestrator writes; see §1.2 Type Resolution for fallback chain). Optional: parallel gap-filling `Task(general-purpose)` reviewers + 1 merge sub-agent.
 - **GATE-A**: Script (`gate_a_check.py`). No sub-agent needed.
 - **GATE-B**: N parallel `Task(general-purpose)` reviewer sub-agents (Map) + 1 reduce sub-agent (Reduce → summary.json). Orchestrator reads summary.json only, applies PASS predicate.
 - **REVIEW Mode B/C**: Single isolated `Task(general-purpose)` sub-agent for section/risk analysis. Orchestrator relays AskUserQuestion results.
@@ -114,12 +130,16 @@ For strictness details and Standard→3-route upgrade triggers, see `references/
 
 ## Phase 1: INIT
 
-**Execution**: Run `scripts/ohrfc_init.py` (no sub-agent needed). Fallback: `references/phase_init.md`.
+**Execution**: Run `<skill_dir>/scripts/ohrfc_init.py` with `--project-dir <user_project_dir>` (no sub-agent needed). The script is the **mandatory primary path** — it handles workspace creation, template rendering, schema validation, and state initialization atomically. Only fall back to `references/phase_init.md` manual steps if the script fails with an error (e.g. Python unavailable); in that case, all `.ohrfc/` paths MUST be resolved under `<user_project_dir>`, not the skill directory.
 
-**Workspace Routing**: Before creating a new RFC, detect existing workspaces:
+**Workspace Routing**: Before creating a new RFC, detect existing workspaces.
+
+**CRITICAL**: The `--project-dir` parameter MUST always be passed to ensure workspaces are scanned/created in the **user's project directory**, NOT in the skill directory. Use the user's current working directory (the project root where `/ohrfc` was invoked).
+
 ```bash
-python3 scripts/ohrfc_init.py scan
+python3 <skill_dir>/scripts/ohrfc_init.py scan --project-dir <user_project_dir>
 ```
+- The output includes `scanned_dir` (confirming which directory was scanned) and `workspaces` array.
 - **No workspaces** → proceed directly to new-RFC flow (no AskUserQuestion)
 - **Workspaces found** → AskUserQuestion (single-select):
   - "新建 RFC" (always present)
@@ -127,9 +147,9 @@ python3 scripts/ohrfc_init.py scan
   - "继续未完成 RFC: \<id\>" (only if `baseline_accepted=false` AND `current_phase≠init`) → Resume via Bootstrap Protocol
 - **Only "新建 RFC" qualifies** → skip AskUserQuestion, proceed to new-RFC flow
 
-**New-RFC flow** (unchanged):
+**New-RFC flow**:
 ```bash
-python3 scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard]
+python3 <skill_dir>/scripts/ohrfc_init.py create <rfc_id> <rfc_title> [--strictness standard] --project-dir <user_project_dir>
 ```
 
 **Summary**:
@@ -181,20 +201,20 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Ref** (sub-agent): `references/phase_design.md` + `references/rfc_template.md` + `references/design_assets.md` + `references/methodology.md` §3-8. On demand: `references/security_template.md`
 
-**Execution**: Dispatch single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft. Orchestrator receives draft, validates self-check, writes rfc.md + state transition. Fallback: `Task(general-purpose)` if Plan unavailable.
+**Execution**: Dispatch single `Task(Plan)` sub-agent for architectural reasoning → returns complete rfc.md draft. Orchestrator receives draft, validates self-check, writes rfc.md + state transition. See §1.2 Type Resolution for fallback chain.
 
 **Quality bar**: The DESIGN sub-agent's output will be strictly cross-reviewed by multiple independent AI models — including Codex (known for rigorous structural analysis), Gate-A automated script (22 mechanical checks), and Gate-B multi-route reviewers. Every rework cycle wastes context budget. The sub-agent prompt MUST include this pressure statement to set the right quality bar from the start.
 
 **Summary** (3 steps + optional parallel gap-filling):
-1. **Fill review layer** (§1-§6): background, pain points, goals, TL;DR, solution overview, impact/compatibility
-2. **Fill normative layer** (§7-§11): decisions, security model, reliability, observability, acceptance (5-category SCN)
-3. **Fill gates/appendix** (§12-§16): change log, trigger declarations, release meta, roles + self-check
+1. **Fill §1-§7**: background, pain points, goals, TL;DR, key decisions/trade-offs, solution overview, impact/compatibility
+2. **Fill normative layer** (§8-§11): security model, reliability, observability, acceptance (5-category SCN)
+3. **Fill gates/appendix** (§12-§15): change log, trigger declarations, release meta, roles + self-check
 
-**Socratic Pause protocol**: Core questions (C1: root problem? C2: still best in 1 year?) + section-fixed questions + context-dynamic questions are embedded at each section's generation point. Includes **emergent fork escalation**: when Socratic Pause reveals an architectural fork with ≤80% confidence, sub-agent returns escalation signal to orchestrator → AskUserQuestion presents fork + trade-offs → user decision resumes design. Max 2 escalations per DESIGN; implementation-level choices stay autonomous. See `references/phase_design.md` Step 1/2 for the full protocol.
+**Socratic Pause protocol**: Core questions (C1: root problem? C2: still best in 1 year?) + section-fixed questions + context-dynamic questions are embedded at each section's generation point. **Strictness-based Pause depth**: Full = all sections full Pause; Standard = high-risk sections (§3-§9, §11) full Pause, low-risk sections (§1, §2, §10) lightweight Pause (internal reasoning only, no sequential-thinking tool call); Light = all lightweight. Includes **emergent fork escalation**: when Socratic Pause reveals an architectural fork with ≤80% confidence, sub-agent returns escalation signal to orchestrator → AskUserQuestion presents fork + trade-offs → user decision resumes design. Max 2 escalations per DESIGN; implementation-level choices stay autonomous. See `references/phase_design.md` Step 1/2 for the full protocol.
 
-**§5.4 API Contract Design**: When the RFC involves public API changes (ArkTS, C/C++ APIs), §5.4 must be filled covering: interface specification, developer model, error codes, versioning strategy, and existing API compatibility.
+**§6.4 API Contract Design**: When the RFC involves public API changes (ArkTS, C/C++ APIs), §6.4 must be filled covering: interface specification, developer model, error codes, versioning strategy, and existing API compatibility.
 
-**§6.1.3 API Compatibility**: §6.1.3 covers API contract compatibility with breaking change rules for OS service APIs.
+**§7.1.3 API Compatibility**: §7.1.3 covers API contract compatibility with breaking change rules for OS service APIs.
 
 **Optional parallel gap-filling** (Standard with upgrade triggers / Full):
 - Launch 2-3 Task(general-purpose) sub-agents: Architect / Security / QA
@@ -203,7 +223,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 - Orchestrator writes merged draft to rfc.md (single-writer)
 - Light mode: single sub-agent writes complete draft directly; no parallel gap-filling
 
-**Self-check** (must pass before GATE): Run template §16.2 (13 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
+**Self-check** (must pass before GATE): Run template §15.2 (13 items) + 6 additional checks (structure/expression/coverage/strictness/auditable/consistency).
 
 **Integrated Gate-A**: Sub-agent runs formal `gate_a_check.py` (no --dry-run) internally, fixes failures and re-runs until PASS. Returns rfc.md + Gate-A PASS output to orchestrator. Orchestrator trusts result, updates state directly (gate_a_result: "pass", current_phase: "gate_b") — no redundant re-run.
 
@@ -226,7 +246,7 @@ Dependency chain: `QUICK_SCAN → REASONING_PASS → CLARIFY → EVIDENCE_TARGET
 
 **Preferred**: Execute `scripts/gate_a_check.py`:
 ```bash
-python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id>/evidence.json
+python3 <skill_dir>/scripts/gate_a_check.py <user_project_dir>/.ohrfc/<rfc_id>/rfc.md --evidence <user_project_dir>/.ohrfc/<rfc_id>/evidence.json
 ```
 
 | Check | Type | What |
@@ -239,7 +259,7 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 | 6 | HARD | SCN category coverage (5 minimum categories) |
 | 7 | HARD | Evidence cross-check (EVD citations valid) |
 | 8 | HARD | Strictness visibility (strictness field + upgrade DEC) |
-| 9 | HARD | Trigger declarations (§14 format) |
+| 9 | HARD | Trigger declarations (§13 format) |
 | 10 | HARD | HR-SCN binding integrity |
 | 11 | HARD | DEC alternatives documented |
 | 12 | HARD | Must-pass SCN validity |
@@ -252,7 +272,7 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 | 19 | SOFT | Unresolved format compliance |
 | 20 | SOFT | Orphan SCN detection |
 | 21 | SOFT | Cross-section redundancy |
-| 22 | SOFT | Implementation detail in §5 |
+| 22 | SOFT | Implementation detail in §6 |
 
 17 HARD checks block progression (any FAIL → back to DESIGN). 5 SOFT checks produce WARN only (do not block).
 
@@ -339,8 +359,8 @@ python3 scripts/gate_a_check.py .ohrfc/<rfc_id>/rfc.md --evidence .ohrfc/<rfc_id
 **Ref** (sub-agent): `references/phase_finalize.md`
 
 **Summary**:
-1. AskUserQuestion: ask user whether to export derivative artifacts (tasks.md, verification_checklist.md); default is archive-only, skip export if declined
-2. If export requested: dispatch sub-agent for export (tasks.md from SCN, acceptance checklist)
+1. AskUserQuestion: ask user whether to export derivative artifacts (tasks.md, verification_checklist.md, readable_digest.md); default is archive-only, skip export if declined
+2. If export requested: dispatch sub-agent for export (tasks.md from SCN, acceptance checklist, and/or readable digest via `scripts/export_readable.py`)
 3. Archive process artifacts (events.jsonl, summary.json)
 4. Lock rfc.md normative content. State: phase=finalize.
 

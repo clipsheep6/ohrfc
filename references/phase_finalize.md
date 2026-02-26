@@ -16,10 +16,10 @@ No additional references required.
 
 1. **AskUserQuestion: Export derivatives?**
    Ask user whether to export derivative artifacts:
-   - Options: "导出任务清单和验收清单 (tasks.md + verification_checklist.md)" / "仅归档，不导出"
+   - Options: "导出任务清单和验收清单 (tasks.md + verification_checklist.md)" / "导出人可读摘要 (readable_digest.md)" / "全部导出" / "仅归档，不导出"
    - Default behavior: **archive-only** (no export unless user explicitly opts in)
 
-2. **If export requested**: Dispatch sub-agent for derivative export (see Task Export below)
+2. **If export requested**: Dispatch sub-agent for derivative export (see Task Export / Readable Digest below)
 
 3. **Archive process artifacts**:
    - Ensure `.debug/events.jsonl` preserved (truncation/timeout audit trail)
@@ -42,6 +42,27 @@ When task export is requested or configured:
    - Format: markdown checklist with SCN-### ID, category, and one-line description
 
 3. **Output format**: Markdown by default. Future option: configurable export targets (Jira/Linear/GitHub Issues) via export adapter.
+
+## Readable Digest Export (optional)
+
+When readable digest export is requested:
+
+Run `scripts/export_readable.py` to generate a stakeholder-friendly summary:
+
+```bash
+python3 <skill_dir>/scripts/export_readable.py <user_project_dir>/.ohrfc/<rfc_id>/rfc.md -o <user_project_dir>/.ohrfc/<rfc_id>/readable_digest.md
+```
+
+**What it produces**:
+- Keeps: §1 背景, §2 痛点, §3 目标, §4 一页结论, §5 决策, §6 方案概览 (with diagrams), §7 影响分析
+- Strips: §12-§15 (gate declarations, self-check, release meta, change log)
+- Cleans: removes dense inline EVD/REQ references for readability
+
+**Options**:
+- `--include-normative`: also include §8 安全, §9 可靠性, §10 可观测性, §11 验收 (summary only)
+- `--no-diagrams`: strip Mermaid blocks (for text-only review)
+
+Output: `.ohrfc/<rfc_id>/readable_digest.md`
 
 ## Hard Rule
 

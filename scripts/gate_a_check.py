@@ -17,16 +17,16 @@ HARD checks (block progression):
 12. Must-pass validity (all SCN IDs in must-pass set exist)
 13. Coverage matrix (Standard/Full strictness requires risk→SCN mapping)
 14. Section non-empty (required sections have ≥3 non-whitespace lines)
-15. Impact table columns (§6 impact section has required dimensions)
+15. Impact table columns (§7 impact section has required dimensions)
 16. Diagram type coverage (architecture/boundary + sequence diagrams present)
-17. Compatibility dimensions (§6 compatibility section covers 4 required dimensions)
+17. Compatibility dimensions (§7 compatibility section covers 4 required dimensions)
 
 SOFT checks (WARNING only, do not block):
 18. Diagram-text pairing (mermaid blocks have nearby prose)
 19. Unresolved format (Hard-Unresolved items have owner/action/convergence)
 20. Orphan SCN (SCN not referenced by any HR or must-pass set)
 21. Cross-section redundancy (same EVD/HR text duplicated across sections)
-22. §5 implementation detail (class names, method signatures, sync primitives in design)
+22. §6 implementation detail (class names, method signatures, sync primitives in design)
 
 Usage:
     python3 gate_a_check.py <rfc.md> [--evidence <evidence.json>] [--template <template.md>] [--dry-run]
@@ -618,10 +618,10 @@ def check_9_triggers(rfc: str) -> CheckResult:
     r = CheckResult("9. Trigger declarations")
 
     # Find trigger section using _extract_section for proper heading-level handling
-    # This correctly captures content under '## 14. 门禁声明' including subsections like '### 14.1 触发器声明'
+    # This correctly captures content under '## 13. 门禁声明' including subsections like '### 13.1 触发器声明'
     trigger_section_text = _extract_section(rfc, r'(?:触发器|trigger|门禁触发|门禁声明|门禁|Gate Trigger)')
     if not trigger_section_text:
-        r.fail("No trigger declaration section found (expected §14 or equivalent)")
+        r.fail("No trigger declaration section found (expected §13 or equivalent)")
         return r
 
     trigger_text = trigger_section_text
@@ -970,7 +970,7 @@ COMPAT_DIMENSIONS = {
 def check_15_impact_table(rfc: str) -> CheckResult:
     """Check 15: Impact/影响 section contains table with required dimensions (API/策略/下游/行为).
 
-    Looks for a table in §6 (影响分析) that covers the 4 impact dimensions either
+    Looks for a table in §7 (影响分析) that covers the 4 impact dimensions either
     as column headers or as row labels. Alternatively accepts a structured list
     that covers all 4 dimensions.
     """
@@ -1079,7 +1079,7 @@ def check_16_diagram_types(rfc: str) -> CheckResult:
 def check_17_compat_dimensions(rfc: str) -> CheckResult:
     """Check 17: Compatibility section covers 4 required dimensions (不变/变化/默认值策略/回滚).
 
-    Scans §6 (影响分析与兼容性) or any section with 兼容 in the heading
+    Scans §7 (影响分析与兼容性) or any section with 兼容 in the heading
     for the 4 compatibility dimensions.
     """
     r = CheckResult("17. Compatibility dimensions")
@@ -1298,7 +1298,7 @@ def check_21_cross_section_redundancy(rfc: str, evidence: dict) -> CheckResult:
     return r
 
 
-# Patterns for implementation detail detection in §5
+# Patterns for implementation detail detection in §6
 IMPL_METHOD_PATTERN = re.compile(
     r'\b[A-Z][a-zA-Z0-9_]+(?:\.|::)[a-zA-Z_][a-zA-Z0-9_]*\s*(?:\([^)]*\))?'
 )
@@ -1310,14 +1310,14 @@ IMPL_TYPE_KEYWORDS = re.compile(
 
 
 def check_22_impl_detail_in_design(rfc: str) -> CheckResult:
-    """Check 22 (SOFT): §5 should not contain implementation-level details."""
-    r = CheckResult("22. §5 implementation detail", kind="soft")
+    """Check 22 (SOFT): §6 should not contain implementation-level details."""
+    r = CheckResult("22. §6 implementation detail", kind="soft")
 
-    section_5 = _extract_section(rfc, r'(?:5|方案)')
-    if not section_5:
+    section_6 = _extract_section(rfc, r'(?:6|方案)')
+    if not section_6:
         return r
 
-    lines = section_5.split('\n')
+    lines = section_6.split('\n')
     in_code_block = False
 
     for i, line in enumerate(lines, 1):
@@ -1340,13 +1340,13 @@ def check_22_impl_detail_in_design(rfc: str) -> CheckResult:
 
         # Check for method signature patterns
         for m in IMPL_METHOD_PATTERN.finditer(stripped):
-            r.warn(f"§5 line {i}: possible implementation class/method reference '{m.group()}' — "
+            r.warn(f"§6 line {i}: possible implementation class/method reference '{m.group()}' — "
                    f"use functional role names instead")
 
         # Check for language-specific type keywords
         for m in IMPL_TYPE_KEYWORDS.finditer(stripped):
-            r.warn(f"§5 line {i}: possible implementation-level keyword '{m.group()}' — "
-                   f"§5 should describe behavioral contracts, not implementation types")
+            r.warn(f"§6 line {i}: possible implementation-level keyword '{m.group()}' — "
+                   f"§6 should describe behavioral contracts, not implementation types")
 
     return r
 
